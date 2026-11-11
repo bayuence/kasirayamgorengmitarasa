@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@layer base {
+
 /* =============================================
    MOBILE-FIRST BASE CSS
    Max lebar konten 480px, tengah di desktop
@@ -79,7 +81,7 @@ a {
   color: inherit;
 }
 
-input, select, textarea {
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -123,4 +125,6 @@ textarea:focus {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
 }

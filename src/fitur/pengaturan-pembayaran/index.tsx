@@ -252,7 +252,6 @@ export function LayarPengaturanPembayaran() {
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>💵</span>
             <span>1. Tunai (Pecahan Kasir)</span>
           </button>
           <button
@@ -264,7 +263,6 @@ export function LayarPengaturanPembayaran() {
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>📱</span>
             <span>2. QRIS Dinamis Toko</span>
           </button>
         </div>
@@ -276,7 +274,7 @@ export function LayarPengaturanPembayaran() {
           <div class="space-y-4">
             {/* Kartu Edukasi */}
             <div class="bg-blue-50/60 border border-blue-200/60 rounded-2xl p-4 text-xs text-blue-900 leading-relaxed">
-              <strong class="font-bold block mb-1">💡 Pengaturan Kebiasaan Uang Pembeli:</strong>
+              <strong class="font-bold block mb-1">Pengaturan Kebiasaan Uang Pembeli:</strong>
               Atur pecahan uang yang sering digunakan pelanggan di toko Anda. Tombol ini akan langsung muncul di pop-up pembayaran kasir sehingga kasir bisa langsung klik-klik cepat tanpa mengetik manual.
             </div>
 
@@ -425,7 +423,7 @@ export function LayarPengaturanPembayaran() {
           <div class="space-y-4">
             {/* Kartu Edukasi */}
             <div class="bg-indigo-50/70 border border-indigo-200/70 rounded-2xl p-4 text-xs text-indigo-950 leading-relaxed">
-              <strong class="font-bold block mb-1">💡 QRIS Statis Otomatis Jadi Dinamis:</strong>
+              <strong class="font-bold block mb-1">QRIS Statis Otomatis Jadi Dinamis:</strong>
               Upload gambar QRIS statis outlet Anda (dari BCA, BRI, Mandiri, ShopeePay, Dana, dll.). Sistem akan otomatis menyuntikkan nominal tagihan pesanan kasir, sehingga pembeli yang scan <strong>tidak perlu lagi mengetik uang manual</strong>.
             </div>
 
@@ -444,7 +442,7 @@ export function LayarPengaturanPembayaran() {
                     const adaQris = !!petaQrisOutlet[o.id];
                     return (
                       <option key={o.id} value={o.id}>
-                        {o.nama} {adaQris ? '✓ (QRIS Aktif)' : '• (Belum ada QRIS)'}
+                        {o.nama} {adaQris ? '(QRIS Aktif)' : '(Belum ada QRIS)'}
                       </option>
                     );
                   })}

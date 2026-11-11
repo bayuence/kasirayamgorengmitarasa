@@ -393,7 +393,7 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    💵 Tunai (Cash)
+                    Tunai (Cash)
                   </button>
                   <button
                     type="button"
@@ -404,7 +404,7 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    📱 QRIS
+                    QRIS
                   </button>
                 </div>
               </div>
@@ -464,7 +464,7 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
                   >
                     <div>
                       <span class="text-[10.5px] font-bold block uppercase tracking-wider">
-                        {kekurangan > 0 ? '⚠️ Uang Kurang:' : '✓ Kembalian:'}
+                        {kekurangan > 0 ? 'Uang Kurang:' : '✓ Kembalian:'}
                       </span>
                       <span class="text-[10px] opacity-80 block">
                         {kekurangan > 0

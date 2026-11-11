@@ -105,3 +105,4 @@ export function hapusQrisOutlet(outletId: string): void {
   localStorage.setItem(KUNCI_STORAGE_QRIS, JSON.stringify(semua));
   daftarQrisOutletSignal.value = { ...semua };
 }
+
