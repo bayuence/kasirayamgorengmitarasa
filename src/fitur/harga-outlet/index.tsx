@@ -74,7 +74,7 @@ export function LayarHargaOutlet() {
 
     if (!nominalRaw || nominalRaw.trim() === '') {
       await hapusHargaKhususProdukOutlet(outletTerpilih, produkId);
-      notifikasi(`Harga "${namaProduk}" direset ke harga dasar pusat`);
+      notifikasi(`Harga "${namaProduk}" kembali mengikuti harga pusat`);
     } else {
       const nominal = Number(nominalRaw);
       if (isNaN(nominal) || nominal < 0) {
@@ -98,30 +98,35 @@ export function LayarHargaOutlet() {
   const outletObj = daftarOutlet.find((o) => o.id === outletTerpilih);
 
   return (
-    <div style={{ padding: '20px 16px 80px' }}>
+    <div style={{ padding: '16px 16px 80px', maxWidth: '640px', margin: '0 auto' }}>
       {/* Back link */}
       <a
         href="#/kasir"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px',
-          fontSize: '0.75rem',
+          gap: '6px',
+          fontSize: '0.8125rem',
           fontWeight: 600,
           color: '#64748b',
           textDecoration: 'none',
-          marginBottom: '10px',
+          marginBottom: '14px',
+          padding: '2px 0',
         }}
       >
-        ‹ Kembali ke Kasir
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+        <span>Kembali ke Kasir</span>
       </a>
 
       {/* Header Halaman */}
       <div style={{ marginBottom: '18px' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
+        <h2 style={{ fontSize: '1.375rem', fontWeight: 800, margin: '0 0 4px', color: '#0f172a', letterSpacing: '-0.025em' }}>
           Penetapan Harga per Toko
         </h2>
-        <p style={{ fontSize: '0.8125rem', color: '#64748b', marginTop: '3px', marginBottom: 0 }}>
+        <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
           Atur harga jual khusus untuk masing-masing cabang toko
         </p>
       </div>
@@ -137,9 +142,15 @@ export function LayarHargaOutlet() {
             fontWeight: 600,
             marginBottom: '16px',
             border: '1px solid #bbf7d0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}
         >
-          {pesanSukses}
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span>{pesanSukses}</span>
         </div>
       )}
 
@@ -147,22 +158,24 @@ export function LayarHargaOutlet() {
         <div
           style={{
             textAlign: 'center',
-            padding: '36px 16px',
+            padding: '36px 20px',
             background: '#ffffff',
             border: '1px dashed #cbd5e1',
-            borderRadius: '12px',
+            borderRadius: '14px',
           }}
         >
-          <p style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#0f172a', margin: '0 0 4px' }}>
+          <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>
             Belum ada cabang toko yang didaftarkan
           </p>
-          <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: '0 0 16px' }}>
+          <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: '0 0 16px', lineHeight: 1.4 }}>
             Daftarkan lokasi cabang toko terlebih dahulu sebelum mengatur perbedaan harga.
           </p>
           <a
             href="#/outlet"
             style={{
-              display: 'inline-block',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
               padding: '10px 18px',
               background: '#0f172a',
               color: '#ffffff',
@@ -172,7 +185,8 @@ export function LayarHargaOutlet() {
               textDecoration: 'none',
             }}
           >
-            Buka Menu Lokasi & Cabang Toko ›
+            <span>Buka Menu Lokasi & Cabang Toko</span>
+            <span>›</span>
           </a>
         </div>
       ) : (
@@ -182,12 +196,13 @@ export function LayarHargaOutlet() {
             style={{
               background: '#ffffff',
               border: '1px solid #e2e8f0',
-              borderRadius: '12px',
+              borderRadius: '14px',
               padding: '16px',
               marginBottom: '18px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
             }}
           >
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
+            <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
               Pilih Toko / Cabang yang Ingin Diatur:
             </label>
             <select
@@ -198,7 +213,7 @@ export function LayarHargaOutlet() {
                 padding: '10px 12px',
                 border: '1px solid #cbd5e1',
                 borderRadius: '8px',
-                background: '#ffffff',
+                background: '#f8fafc',
                 fontSize: '0.9375rem',
                 fontWeight: 600,
                 color: '#0f172a',
@@ -213,18 +228,22 @@ export function LayarHargaOutlet() {
             </select>
 
             <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '8px 0 0', lineHeight: 1.4 }}>
-              💡 Anda sedang mengatur harga untuk: <strong>{outletObj?.nama || 'Toko'}</strong>. Masukkan nominal khusus di bawah. Jika dikosongkan, produk akan otomatis memakai harga master pusat.
+              💡 Mengatur harga untuk: <strong style={{ color: '#0f172a' }}>{outletObj?.nama || 'Toko'}</strong>. Kosongkan jika ingin mengikuti <strong>Harga Dasar Pusat</strong>.
             </p>
           </div>
 
           {/* Daftar Produk */}
           <div>
-            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '10px' }}>
-              Daftar Menu ({produkList.length})
-            </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Daftar Menu ({produkList.length})
+              </span>
+            </div>
 
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>Memuat data harga toko...</div>
+              <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8', fontSize: '0.875rem' }}>
+                Memuat data harga toko...
+              </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {produkList.map(({ produk, hargaKhusus, hargaEfektif }) => {
@@ -237,11 +256,12 @@ export function LayarHargaOutlet() {
                       style={{
                         background: '#ffffff',
                         border: isCustom ? '1.5px solid #93c5fd' : '1px solid #e2e8f0',
-                        borderRadius: '10px',
+                        borderRadius: '12px',
                         padding: '14px',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '10px',
+                        boxShadow: isCustom ? '0 2px 8px rgba(59,130,246,0.06)' : '0 1px 2px rgba(0,0,0,0.02)',
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -254,7 +274,7 @@ export function LayarHargaOutlet() {
                               {produk.paket}
                             </h4>
                           </div>
-                          <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginTop: '2px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginTop: '3px' }}>
                             Harga Dasar Pusat: <strong style={{ color: '#0f172a' }}>{formatRupiah(produk.harga)}</strong>
                           </span>
                         </div>
@@ -293,7 +313,7 @@ export function LayarHargaOutlet() {
                               width: '100%',
                               padding: '8px 10px 8px 32px',
                               border: '1px solid #cbd5e1',
-                              borderRadius: '6px',
+                              borderRadius: '8px',
                               fontSize: '0.875rem',
                               fontWeight: 600,
                               color: '#0f172a',
@@ -312,12 +332,12 @@ export function LayarHargaOutlet() {
                             background: '#0f172a',
                             color: '#ffffff',
                             border: 'none',
-                            borderRadius: '6px',
+                            borderRadius: '8px',
                             fontSize: '0.8125rem',
                             fontWeight: 600,
                             cursor: 'pointer',
                             minHeight: '36px',
-                            minWidth: 'auto',
+                            whiteSpace: 'nowrap',
                           }}
                         >
                           Simpan
@@ -332,12 +352,12 @@ export function LayarHargaOutlet() {
                               background: '#ffffff',
                               color: '#dc2626',
                               border: '1px solid #fecaca',
-                              borderRadius: '6px',
+                              borderRadius: '8px',
                               fontSize: '0.75rem',
                               fontWeight: 600,
                               cursor: 'pointer',
                               minHeight: '36px',
-                              minWidth: 'auto',
+                              whiteSpace: 'nowrap',
                             }}
                           >
                             Reset
@@ -355,4 +375,3 @@ export function LayarHargaOutlet() {
     </div>
   );
 }
-

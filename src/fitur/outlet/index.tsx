@@ -83,19 +83,6 @@ export function LayarKelolaOutlet() {
     }
   };
 
-  const muatPresensi = async () => {
-    setLoadingPresensi(true);
-    try {
-      const list = await muatDaftarLokasiPresensi();
-      setLokasiPresensi(list);
-    } catch (e) {
-      console.warn('Gagal muat lokasi presensi:', e);
-      setLokasiPresensi([]);
-    } finally {
-      setLoadingPresensi(false);
-    }
-  };
-
   const notifikasi = (teks: string) => {
     setPesanSukses(teks);
     setTimeout(() => setPesanSukses(''), 4000);
@@ -115,6 +102,19 @@ export function LayarKelolaOutlet() {
 
     if (tab === 'presensi') {
       muatPresensi();
+    }
+  };
+
+  const muatPresensi = async () => {
+    setLoadingPresensi(true);
+    try {
+      const list = await muatDaftarLokasiPresensi();
+      setLokasiPresensi(list);
+    } catch (e) {
+      console.warn('Gagal muat lokasi presensi:', e);
+      setLokasiPresensi([]);
+    } finally {
+      setLoadingPresensi(false);
     }
   };
 
@@ -193,57 +193,97 @@ export function LayarKelolaOutlet() {
 
   const outletAktif = outletAktifSignal.value;
 
+  // Urutkan: Toko aktif perangkat ini selalu di urutan pertama
+  const sortedOutlets = [...daftarOutlet].sort((a, b) => {
+    if (a.id === outletAktif?.id) return -1;
+    if (b.id === outletAktif?.id) return 1;
+    return a.nama.localeCompare(b.nama);
+  });
+
   return (
-    <div style={{ padding: '20px 16px 80px' }}>
-      {/* Back link */}
+    <div style={{ padding: '16px 16px 80px', maxWidth: '640px', margin: '0 auto' }}>
+      {/* Back navigation */}
       <a
         href="#/kasir"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px',
-          fontSize: '0.75rem',
+          gap: '6px',
+          fontSize: '0.8125rem',
           fontWeight: 600,
           color: '#64748b',
           textDecoration: 'none',
-          marginBottom: '10px',
+          marginBottom: '14px',
+          padding: '2px 0',
         }}
       >
-        ‹ Kembali ke Kasir
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+        <span>Kembali ke Kasir</span>
       </a>
 
-      {/* Header Halaman */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px', gap: '8px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
-            Lokasi & Cabang Toko
-          </h2>
-          <p style={{ fontSize: '0.8125rem', color: '#64748b', marginTop: '3px', marginBottom: 0 }}>
-            Pilih cabang aktif kasir dan kelola cabang manual maupun dari presensi
-          </p>
-        </div>
+      {/* Header Halaman (Layout Luas & Bersih) */}
+      <div style={{ marginBottom: '18px' }}>
+        <h2 style={{ fontSize: '1.375rem', fontWeight: 800, margin: '0 0 4px', color: '#0f172a', letterSpacing: '-0.025em' }}>
+          Lokasi & Cabang Toko
+        </h2>
+        <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: '0 0 14px', lineHeight: 1.4 }}>
+          Kelola seluruh lokasi cabang toko dan atur toko aktif kasir perangkat ini
+        </p>
 
-        <div style={{ display: 'flex', gap: '6px' }}>
+        {/* Toolbar Tombol Aksi (Rapi & Seimbang) */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => handleBukaTambah('manual')}
+            style={{
+              flex: 1,
+              padding: '10px 14px',
+              background: '#0f172a',
+              color: '#ffffff',
+              borderRadius: '8px',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              border: 'none',
+              cursor: 'pointer',
+              minHeight: '38px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 1px 2px rgba(15,23,42,0.08)',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span>Tambah Cabang</span>
+          </button>
+
           {daftarOutlet.some((o) => o.sumber === 'presensi') && (
             <button
               type="button"
               disabled={loadingSync}
               onClick={handleSinkronkanPresensi}
-              title="Sinkronkan pembaruan nama cabang dari Presensi"
+              title="Periksa & perbarui nama cabang dari Presensi Donattour"
               style={{
-                padding: '8px 12px',
+                padding: '10px 14px',
                 background: '#eff6ff',
                 color: '#1d4ed8',
-                borderRadius: '6px',
+                borderRadius: '8px',
                 fontSize: '0.8125rem',
                 fontWeight: 600,
                 border: '1px solid #bfdbfe',
                 cursor: loadingSync ? 'not-allowed' : 'pointer',
-                minHeight: '36px',
-                whiteSpace: 'nowrap',
+                minHeight: '38px',
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '6px',
+                whiteSpace: 'nowrap',
               }}
             >
               <svg
@@ -262,33 +302,6 @@ export function LayarKelolaOutlet() {
               <span>{loadingSync ? 'Sinkron...' : 'Sinkron Presensi'}</span>
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={() => handleBukaTambah('manual')}
-            style={{
-              padding: '8px 14px',
-              background: '#0f172a',
-              color: '#ffffff',
-              borderRadius: '6px',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              minHeight: '36px',
-              minWidth: 'auto',
-              whiteSpace: 'nowrap',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            <span>Tambah Cabang</span>
-          </button>
         </div>
       </div>
 
@@ -308,108 +321,30 @@ export function LayarKelolaOutlet() {
             gap: '8px',
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
           <span>{pesanSukses}</span>
         </div>
       )}
 
-      {/* Banner Cabang Aktif Kasir Saat Ini (Hanya tampil jika ada cabang terdaftar) */}
-      {daftarOutlet.length > 0 && outletAktif && outletAktif.id && (
-        <div
-          style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '12px',
-            padding: '16px',
-            marginBottom: '16px',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Cabang Aktif di Perangkat Kasir Ini
-            </span>
-
-            {/* Label Asal Data */}
-            {outletAktif.sumber === 'presensi' ? (
-              <span
-                style={{
-                  fontSize: '0.625rem',
-                  fontWeight: 700,
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  background: '#eff6ff',
-                  color: '#1d4ed8',
-                  border: '1px solid #bfdbfe',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 21h18"/>
-                  <path d="M5 21V7l8-4v18"/>
-                  <path d="M19 21V11l-6-4"/>
-                </svg>
-                Dari Presensi
-              </span>
-            ) : (
-              <span
-                style={{
-                  fontSize: '0.625rem',
-                  fontWeight: 600,
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  border: '1px solid #e2e8f0',
-                }}
-              >
-                Input Manual
-              </span>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-            <div>
-              <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                {outletAktif.nama}
-              </h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
-                Kode: <strong style={{ color: '#0f172a' }}>{outletAktif.kode}</strong> • {outletAktif.alamat || 'Alamat belum diatur'}
-              </p>
-            </div>
-            <span
-              style={{
-                fontSize: '0.6875rem',
-                fontWeight: 600,
-                padding: '3px 8px',
-                borderRadius: '999px',
-                background: '#f0fdf4',
-                color: '#15803d',
-                border: '1px solid #bbf7d0',
-              }}
-            >
-              ● Aktif
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Daftar Semua Cabang */}
+      {/* Daftar Semua Cabang (Single Source of Truth, Tanpa Duplikasi) */}
       <div>
-        <div style={{ marginBottom: '10px' }}>
-          <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-            Daftar Cabang & Lokasi Toko ({daftarOutlet.length})
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, margin: 0, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Daftar Cabang Toko ({daftarOutlet.length})
           </h3>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
-            Pilih cabang untuk mengaktifkan kasir atau atur harga khusus per toko
-          </p>
+          {outletAktif && (
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+              Aktif: <strong style={{ color: '#0f172a' }}>{outletAktif.nama}</strong>
+            </span>
+          )}
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Memuat daftar cabang...</div>
+          <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '0.875rem' }}>
+            Memuat daftar cabang...
+          </div>
         ) : daftarOutlet.length === 0 ? (
           /* Empty State dengan 2 Pilihan Tambah */
           <div
@@ -418,13 +353,13 @@ export function LayarKelolaOutlet() {
               padding: '36px 20px',
               background: '#ffffff',
               border: '1px dashed #cbd5e1',
-              borderRadius: '12px',
+              borderRadius: '14px',
             }}
           >
             <div
               style={{
-                width: '44px',
-                height: '44px',
+                width: '46px',
+                height: '46px',
                 borderRadius: '50%',
                 background: '#f1f5f9',
                 display: 'inline-flex',
@@ -443,12 +378,11 @@ export function LayarKelolaOutlet() {
             <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>
               Belum ada cabang toko yang didaftarkan
             </p>
-            <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: '0 auto 20px', maxWidth: '300px', lineHeight: 1.4 }}>
+            <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: '0 auto 18px', maxWidth: '300px', lineHeight: 1.4 }}>
               Pilih salah satu opsi di bawah untuk menambahkan cabang pertama Anda:
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '320px', margin: '0 auto' }}>
-              {/* Opsi 1: Input Manual */}
               <button
                 type="button"
                 onClick={() => handleBukaTambah('manual')}
@@ -474,7 +408,6 @@ export function LayarKelolaOutlet() {
                 <span>+ Input Cabang Manual</span>
               </button>
 
-              {/* Opsi 2: Ambil dari Presensi */}
               <button
                 type="button"
                 onClick={() => handleBukaTambah('presensi')}
@@ -501,9 +434,9 @@ export function LayarKelolaOutlet() {
             </div>
           </div>
         ) : (
-          /* List Semua Cabang */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {daftarOutlet.map((o) => {
+          /* List Semua Cabang (Kartu Rapi & Ergonomis) */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {sortedOutlets.map((o) => {
               const isCurrent = o.id === outletAktif?.id;
               const isPresensi = o.sumber === 'presensi';
 
@@ -513,97 +446,88 @@ export function LayarKelolaOutlet() {
                   style={{
                     background: '#ffffff',
                     border: isCurrent ? '2px solid #0f172a' : '1px solid #e2e8f0',
-                    borderRadius: '12px',
+                    borderRadius: '14px',
                     padding: '16px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '10px',
-                    boxShadow: isCurrent ? '0 2px 8px rgba(15,23,42,0.06)' : 'none',
+                    boxShadow: isCurrent ? '0 4px 14px rgba(15,23,42,0.06)' : '0 1px 3px rgba(0,0,0,0.02)',
+                    position: 'relative',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                  {/* Baris 1: Kode Cabang, Sumber Data, & Status Kasir Aktif */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span
+                        style={{
+                          fontSize: '0.6875rem',
+                          fontWeight: 700,
+                          background: '#0f172a',
+                          color: '#ffffff',
+                          padding: '2px 7px',
+                          borderRadius: '4px',
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        {o.kode}
+                      </span>
+
+                      {/* Tag Sumber */}
+                      {isPresensi ? (
                         <span
                           style={{
                             fontSize: '0.6875rem',
-                            fontWeight: 700,
-                            background: '#0f172a',
-                            color: '#ffffff',
-                            padding: '2px 6px',
+                            fontWeight: 600,
+                            padding: '2px 7px',
                             borderRadius: '4px',
-                            letterSpacing: '0.04em',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            border: '1px solid #bfdbfe',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
                           }}
                         >
-                          {o.kode}
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 21h18"/>
+                            <path d="M5 21V7l8-4v18"/>
+                            <path d="M19 21V11l-6-4"/>
+                          </svg>
+                          Dari Presensi
                         </span>
-
-                        {/* Label Sumber: Dari Presensi atau Manual */}
-                        {isPresensi ? (
-                          <span
-                            style={{
-                              fontSize: '0.625rem',
-                              fontWeight: 700,
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: '#eff6ff',
-                              color: '#1d4ed8',
-                              border: '1px solid #bfdbfe',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '3px',
-                            }}
-                          >
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M3 21h18"/>
-                              <path d="M5 21V7l8-4v18"/>
-                              <path d="M19 21V11l-6-4"/>
-                            </svg>
-                            Dari Presensi
-                          </span>
-                        ) : (
-                          <span
-                            style={{
-                              fontSize: '0.625rem',
-                              fontWeight: 600,
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: '#f8fafc',
-                              color: '#64748b',
-                              border: '1px solid #e2e8f0',
-                            }}
-                          >
-                            Manual
-                          </span>
-                        )}
-
-                        <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-                          {o.nama}
-                        </h4>
-                      </div>
-
-                      <p style={{ fontSize: '0.78125rem', color: '#64748b', margin: '2px 0' }}>
-                        {o.alamat || 'Alamat belum diatur'}
-                      </p>
-                      {o.telepon && (
-                        <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '1px 0 0' }}>
-                          Telp: {o.telepon}
-                        </p>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: '0.6875rem',
+                            fontWeight: 600,
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            background: '#f8fafc',
+                            color: '#64748b',
+                            border: '1px solid #e2e8f0',
+                          }}
+                        >
+                          Manual
+                        </span>
                       )}
                     </div>
 
+                    {/* Status Perangkat Aktif */}
                     {isCurrent ? (
                       <span
                         style={{
                           fontSize: '0.6875rem',
                           fontWeight: 700,
-                          padding: '3px 8px',
-                          borderRadius: '4px',
+                          padding: '3px 9px',
+                          borderRadius: '999px',
                           background: '#0f172a',
                           color: '#ffffff',
-                          whiteSpace: 'nowrap',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
                         }}
                       >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }} />
                         Kasir Aktif di Sini
                       </span>
                     ) : (
@@ -619,9 +543,8 @@ export function LayarKelolaOutlet() {
                           fontWeight: 600,
                           color: '#0f172a',
                           cursor: 'pointer',
-                          minHeight: '30px',
+                          minHeight: '28px',
                           minWidth: 'auto',
-                          whiteSpace: 'nowrap',
                         }}
                       >
                         Gunakan Cabang Ini
@@ -629,35 +552,72 @@ export function LayarKelolaOutlet() {
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: '6px' }}>
-                    <span style={{ fontSize: '0.75rem', color: o.aktif ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
-                      {o.aktif ? '● Beroperasi Aktif' : '○ Nonaktif'}
-                    </span>
+                  {/* Baris 2: Nama Toko & Alamat */}
+                  <div>
+                    <h4 style={{ fontSize: '1.0625rem', fontWeight: 700, margin: '2px 0 4px', color: '#0f172a', letterSpacing: '-0.01em' }}>
+                      {o.nama}
+                    </h4>
 
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      <a
-                        href={`#/harga-outlet?outlet=${o.id}`}
-                        style={{
-                          padding: '4px 8px',
-                          background: '#f1f5f9',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          color: '#0f172a',
-                          textDecoration: 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          minHeight: '28px',
-                        }}
-                      >
-                        Atur Harga Toko Ini ›
-                      </a>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8125rem', color: '#64748b' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                      </svg>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {o.alamat || 'Alamat toko belum diatur'}
+                      </span>
+                    </div>
+
+                    {o.telepon && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                        <span>{o.telepon}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Status Operasional */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 600, color: o.aktif ? '#16a34a' : '#94a3b8' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: o.aktif ? '#16a34a' : '#cbd5e1' }} />
+                    <span>{o.aktif ? 'Beroperasi Aktif' : 'Nonaktif'}</span>
+                  </div>
+
+                  {/* Baris Aksi Terstruktur (Tier 1 & Tier 2) */}
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', marginTop: '4px' }}>
+                    {/* Tier 1: Atur Harga per Toko */}
+                    <a
+                      href={`#/harga-outlet?outlet=${o.id}`}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '9px 12px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '0.8125rem',
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        textDecoration: 'none',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      <span>Atur Harga Menu Khusus Toko Ini</span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </a>
+
+                    {/* Tier 2: Edit, Status, & Hapus */}
+                    <div style={{ display: 'flex', gap: '6px' }}>
                       <button
                         type="button"
                         onClick={() => handleBukaEdit(o)}
                         style={{
-                          padding: '4px 8px',
+                          flex: 1,
+                          padding: '7px 10px',
                           background: '#ffffff',
                           border: '1px solid #e2e8f0',
                           borderRadius: '6px',
@@ -665,17 +625,18 @@ export function LayarKelolaOutlet() {
                           fontWeight: 600,
                           color: '#475569',
                           cursor: 'pointer',
-                          minHeight: '28px',
-                          minWidth: 'auto',
+                          minHeight: '34px',
                         }}
                       >
-                        Edit
+                        Edit Info
                       </button>
+
                       <button
                         type="button"
                         onClick={() => handleToggleAktif(o)}
                         style={{
-                          padding: '4px 8px',
+                          flex: 1,
+                          padding: '7px 10px',
                           background: '#ffffff',
                           border: '1px solid #e2e8f0',
                           borderRadius: '6px',
@@ -683,17 +644,17 @@ export function LayarKelolaOutlet() {
                           fontWeight: 600,
                           color: o.aktif ? '#d97706' : '#16a34a',
                           cursor: 'pointer',
-                          minHeight: '28px',
-                          minWidth: 'auto',
+                          minHeight: '34px',
                         }}
                       >
                         {o.aktif ? 'Nonaktifkan' : 'Aktifkan'}
                       </button>
+
                       <button
                         type="button"
                         onClick={() => handleHapusCabang(o)}
                         style={{
-                          padding: '4px 8px',
+                          padding: '7px 12px',
                           background: '#fff1f2',
                           border: '1px solid #fecdd3',
                           borderRadius: '6px',
@@ -701,8 +662,7 @@ export function LayarKelolaOutlet() {
                           fontWeight: 600,
                           color: '#e11d48',
                           cursor: 'pointer',
-                          minHeight: '28px',
-                          minWidth: 'auto',
+                          minHeight: '34px',
                         }}
                       >
                         Hapus
@@ -716,7 +676,7 @@ export function LayarKelolaOutlet() {
         )}
       </div>
 
-      {/* Modal Tambah / Edit dengan 2 Opsi Tab */}
+      {/* Modal Tambah / Edit */}
       {tampilModal && (
         <div class="sheet-backdrop" onClick={() => setTampilModal(false)}>
           <div class="sheet" onClick={(e) => e.stopPropagation()} style={{ padding: '22px 20px', maxHeight: '88vh', overflowY: 'auto' }}>
@@ -748,7 +708,7 @@ export function LayarKelolaOutlet() {
               </button>
             </div>
 
-            {/* Tab Pilihan Tambah Cabang (Hanya saat tambah baru) */}
+            {/* Tab Pilihan Tambah Cabang */}
             {!editId && (
               <div
                 style={{
@@ -818,7 +778,7 @@ export function LayarKelolaOutlet() {
               </div>
             )}
 
-            {/* ── KONTEN TAB 1: FORM INPUT MANUAL / EDIT ── */}
+            {/* Form Input Manual */}
             {tabModal === 'manual' ? (
               <form onSubmit={handleSimpanManual} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {editId && (
@@ -848,9 +808,6 @@ export function LayarKelolaOutlet() {
                       fontWeight: 700,
                     }}
                   />
-                  <span style={{ fontSize: '0.6875rem', color: '#94a3b8', marginTop: '2px', display: 'block' }}>
-                    Kode unik toko untuk identifikasi kasir dan nomor antrean
-                  </span>
                 </div>
 
                 <div>
@@ -972,10 +929,10 @@ export function LayarKelolaOutlet() {
                 </div>
               </form>
             ) : (
-              /* ── KONTEN TAB 2: AMBIL DARI PRESENSI DONATTOUR ── */
+              /* Tab Ambil dari Presensi */
               <div>
                 <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: '0 0 14px', lineHeight: 1.45 }}>
-                  Pilih lokasi yang sudah terdaftar di sistem Presensi Donattour untuk diimpor ke Kasir Mitarasa. Cabang yang diimpor akan otomatis diberi label <strong>[Dari Presensi]</strong> dan disimpan ke database proyek ini.
+                  Pilih lokasi dari Presensi Donattour untuk diimpor ke Kasir. Cabang otomatis berlabel <strong>[Dari Presensi]</strong> dan dapat diatur harganya masing-masing.
                 </p>
 
                 {loadingPresensi ? (
@@ -1006,7 +963,6 @@ export function LayarKelolaOutlet() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {lokasiPresensi.map((loc) => {
-                      // Periksa apakah lokasi ini sudah pernah diimpor
                       const sudahDiimpor = daftarOutlet.some(
                         (o) => o.presensi_location_id === loc.id || o.id === loc.id
                       );
@@ -1033,7 +989,7 @@ export function LayarKelolaOutlet() {
                               </h4>
                               {sudahDiimpor && (
                                 <span style={{ fontSize: '0.625rem', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
-                                  ✓ Sudah Ada di Kasir
+                                  ✓ Terdaftar
                                 </span>
                               )}
                             </div>
@@ -1045,7 +1001,7 @@ export function LayarKelolaOutlet() {
 
                           {sudahDiimpor ? (
                             <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>
-                              Terdaftar
+                              Sudah Ada
                             </span>
                           ) : (
                             <button
@@ -1068,17 +1024,7 @@ export function LayarKelolaOutlet() {
                                 gap: '6px',
                               }}
                             >
-                              {isSedangImpor ? (
-                                'Mengimpor...'
-                              ) : (
-                                <>
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="12" y1="5" x2="12" y2="19" />
-                                    <line x1="5" y1="12" x2="19" y2="12" />
-                                  </svg>
-                                  <span>Impor Cabang</span>
-                                </>
-                              )}
+                              {isSedangImpor ? 'Mengimpor...' : '+ Impor Cabang'}
                             </button>
                           )}
                         </div>

@@ -17,30 +17,35 @@ export function LayarPengaturanStruk() {
   };
 
   return (
-    <div style={{ padding: '20px 16px 80px' }}>
+    <div style={{ padding: '16px 16px 80px', maxWidth: '640px', margin: '0 auto' }}>
       {/* Back link */}
       <a
         href="#/kasir"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px',
-          fontSize: '0.75rem',
+          gap: '6px',
+          fontSize: '0.8125rem',
           fontWeight: 600,
           color: '#64748b',
           textDecoration: 'none',
-          marginBottom: '10px',
+          marginBottom: '14px',
+          padding: '2px 0',
         }}
       >
-        ‹ Kembali ke Kasir
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+        <span>Kembali ke Kasir</span>
       </a>
 
       {/* Header Halaman */}
       <div style={{ marginBottom: '18px' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
+        <h2 style={{ fontSize: '1.375rem', fontWeight: 800, margin: '0 0 4px', color: '#0f172a', letterSpacing: '-0.025em' }}>
           Format Struk & Printer
         </h2>
-        <p style={{ fontSize: '0.8125rem', color: '#64748b', marginTop: '3px', marginBottom: 0 }}>
+        <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
           Konfigurasi ukuran printer thermal kasir dan pesan footer nota
         </p>
       </div>
