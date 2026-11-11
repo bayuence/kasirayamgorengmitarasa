@@ -398,7 +398,16 @@ export function LayarKasir({ bukaBayarAwal = false }: LayarKasirProps) {
               return (
                 <div
                   key={p.id}
-                  class={`bg-white rounded-xl overflow-hidden border transition-all flex flex-col justify-between ${
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleTambah(p)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleTambah(p);
+                    }
+                  }}
+                  class={`bg-white rounded-xl overflow-hidden border transition-all flex flex-col justify-between cursor-pointer select-none active:scale-[0.98] ${
                     qty > 0
                       ? 'border-slate-900 shadow-sm ring-1 ring-slate-900/15'
                       : 'border-slate-200 shadow-xs hover:border-slate-300'
@@ -442,7 +451,10 @@ export function LayarKasir({ bukaBayarAwal = false }: LayarKasirProps) {
                     </div>
 
                     {/* Tombol Aksi / Stepper di Bawah Kartu */}
-                    <div class="mt-2 pt-1.5 border-t border-slate-100">
+                    <div
+                      class="mt-2 pt-1.5 border-t border-slate-100"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {qty === 0 ? (
                         <button
                           type="button"

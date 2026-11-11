@@ -83,6 +83,25 @@ export function App() {
     };
   }, []);
 
+  // Ukur tinggi bottom nav sebenarnya agar bilah keranjang & pop-up selalu berada di atas footer
+  useEffect(() => {
+    const el = document.querySelector('.bottom-nav') as HTMLElement | null;
+    if (!el) {
+      document.documentElement.style.setProperty('--nav-h', '0px');
+      return;
+    }
+    const set = () =>
+      document.documentElement.style.setProperty('--nav-h', `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    window.addEventListener('resize', set);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', set);
+    };
+  }, [sessionSignal.value, route]);
+
   // ── Halaman login — hanya jika belum login ───────────────────
   if (!sessionSignal.value) {
     return <LayarLogin />;

@@ -111,7 +111,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: var(--nav-h, 56px);
   overflow-y: auto;
   overflow-x: hidden;
   width: 100%;
@@ -230,7 +230,7 @@
 /* ── STICKY BOTTOM ACTION BAR ───────────────── */
 .bottom-bar {
   position: fixed;
-  bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  bottom: var(--nav-h, 56px);
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
@@ -294,7 +294,7 @@
 /* ── BOTTOM SHEET ───────────────────────────── */
 .sheet-backdrop {
   position: fixed;
-  inset: 0;
+  inset: 0 0 var(--nav-h, 0px) 0;
   background: rgba(0,0,0,0.4);
   z-index: 50;
   display: flex;
@@ -307,8 +307,8 @@
   max-width: 480px;
   background: var(--surface);
   border-radius: 20px 20px 0 0;
-  padding: 0 0 calc(16px + env(safe-area-inset-bottom, 0px));
-  max-height: 85vh;
+  padding: 0 0 16px;
+  max-height: min(85vh, calc(100dvh - var(--nav-h, 0px) - 16px));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
