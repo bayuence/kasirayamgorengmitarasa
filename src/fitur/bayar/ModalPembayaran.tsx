@@ -12,6 +12,13 @@ import { sessionSignal } from '../../state/sesi.js';
 import { simpanTransaksiBaru, type HasilTransaksi } from '../../data/outbox.js';
 import { formatTeksStruk, bagikanStruk } from '../../util/struk.js';
 import {
+  konfigurasiTunaiSignal,
+  muatQrisOutlet,
+  type KonfigurasiQrisOutlet,
+} from '../../data/pembayaran.js';
+import { outletAktifSignal } from '../../data/outlet.js';
+import { generateQrisDinamis, generateQrCodeDataUrl } from '../../util/qris.js';
+import {
   IconTutup,
   IconPanahKiri,
   IconCheck,
@@ -41,6 +48,31 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
   const [hasilTransaksi, setHasilTransaksi] = useState<HasilTransaksi | null>(null);
   const [notifSalin, setNotifSalin] = useState<string>('');
 
+  // ── Data QRIS Toko & Generator QR Dinamis ──
+  const [qrisOutlet, setQrisOutlet] = useState<KonfigurasiQrisOutlet | null>(null);
+  const [dynamicQrUrl, setDynamicQrUrl] = useState<string>('');
+  const [loadingDynamicQr, setLoadingDynamicQr] = useState<boolean>(false);
+
+  useEffect(() => {
+    const outletId = outletAktifSignal.value?.id;
+    const qris = muatQrisOutlet(outletId);
+    setQrisOutlet(qris);
+
+    if (qris && total > 0 && metode === 'qris') {
+      setLoadingDynamicQr(true);
+      try {
+        const payload = generateQrisDinamis(qris.qrisPayload, total);
+        generateQrCodeDataUrl(payload)
+          .then(setDynamicQrUrl)
+          .catch(() => setDynamicQrUrl(''))
+          .finally(() => setLoadingDynamicQr(false));
+      } catch {
+        setDynamicQrUrl('');
+        setLoadingDynamicQr(false);
+      }
+    }
+  }, [outletAktifSignal.value?.id, total, metode]);
+
   // Saat modal terbuka, inisialisasi uang pas otomatis jika uangDiterima < total
   useEffect(() => {
     if (uangDiterima < total) {
@@ -54,33 +86,18 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
   const kembalian = Math.max(0, nominalBayar - total);
   const kekurangan = Math.max(0, total - nominalBayar);
 
-  // Buat opsi pecahan nominal pintar berdasarkan total
-  const getNominalSaran = (tot: number): number[] => {
+  // Buat opsi pecahan nominal dari pengaturan kebiasaan kasir
+  const cfgTunai = konfigurasiTunaiSignal.value;
+  const nominalSaran: number[] = (() => {
     const list = new Set<number>();
-    list.add(tot); // Uang pas
-
-    if (tot < 20000) list.add(20000);
-    if (tot < 50000) {
-      const next10k = Math.ceil(tot / 10000) * 10000;
-      if (next10k > tot && next10k < 50000) list.add(next10k);
-      list.add(50000);
+    if (cfgTunai.tampilkanUangPas) {
+      list.add(total); // Uang pas
     }
-    if (tot < 100000) {
-      const next10k = Math.ceil(tot / 10000) * 10000;
-      if (next10k > tot && next10k < 100000 && next10k !== 50000) list.add(next10k);
-      list.add(100000);
+    for (const nom of cfgTunai.pecahanCepat) {
+      list.add(nom);
     }
-    if (tot >= 100000) {
-      const next50k = Math.ceil(tot / 50000) * 50000;
-      if (next50k > tot) list.add(next50k);
-      const next100k = Math.ceil(tot / 100000) * 100000;
-      if (next100k > tot && next100k !== next50k) list.add(next100k);
-    }
-
-    return Array.from(list).sort((a, b) => a - b).slice(0, 4);
-  };
-
-  const nominalSaran = getNominalSaran(total);
+    return Array.from(list).sort((a, b) => a - b);
+  })();
 
   const handlePilihNominal = (nom: number) => {
     setUangDiterima(nom);
@@ -461,17 +478,67 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
                   </div>
                 </div>
               ) : (
-                /* Bagian QRIS */
-                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
-                  <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                    <IconCheck size={18} color="#2563eb" />
+                /* Bagian QRIS Dinamis */
+                qrisOutlet ? (
+                  <div class="bg-white border border-slate-200 rounded-2xl p-4 text-center shadow-2xs space-y-2">
+                    <div class="inline-block p-2 bg-white rounded-xl shadow-xs border border-slate-200">
+                      {loadingDynamicQr ? (
+                        <div class="w-48 h-48 flex items-center justify-center text-xs text-slate-400">
+                          <div class="animate-spin w-5 h-5 border-2 border-slate-300 border-t-slate-900 rounded-full mr-2" />
+                          <span>Menyiapkan QRIS Dinamis...</span>
+                        </div>
+                      ) : dynamicQrUrl ? (
+                        <img
+                          src={dynamicQrUrl}
+                          alt="QRIS Dinamis"
+                          class="w-48 h-48 mx-auto"
+                        />
+                      ) : (
+                        <div class="w-48 h-48 flex items-center justify-center text-xs text-rose-500">
+                          Gagal memuat QRIS
+                        </div>
+                      )}
+                    </div>
+
+                    <div class="space-y-0.5">
+                      <span class="inline-block text-[9.5px] font-extrabold bg-emerald-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        ✓ QRIS Dinamis Otomatis
+                      </span>
+                      <h4 class="text-xs font-bold text-slate-900">
+                        {qrisOutlet.merchantName || qrisOutlet.outletNama}
+                      </h4>
+                      <p class="text-sm font-black text-slate-900 tabular-nums">
+                        Total Tagihan: {formatRupiah(total)}
+                      </p>
+                      <p class="text-[10px] text-slate-500 max-w-xs mx-auto">
+                        Pelanggan tinggal scan dengan m-Banking / e-Wallet (BCA, Mandiri, BRI, GoPay, ShopeePay, Dana). <strong>Nominal tagihan langsung pas otomatis!</strong>
+                      </p>
+                    </div>
                   </div>
-                  <h4 class="text-xs font-bold text-slate-900 mb-0.5">Pembayaran Melalui QRIS Toko</h4>
-                  <p class="text-[11px] text-slate-500 max-w-xs mx-auto leading-relaxed">
-                    Arahkan pelanggan memindai barcode QRIS outlet sebesar{' '}
-                    <strong class="text-slate-900 font-extrabold">{formatRupiah(total)}</strong>.
-                  </p>
-                </div>
+                ) : (
+                  /* Cabang Ini Belum Ada QRIS Statis */
+                  <div class="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-4 text-center space-y-2">
+                    <div class="w-9 h-9 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto">
+                      <IconDompet size={18} color="#b45309" />
+                    </div>
+                    <h4 class="text-xs font-bold text-amber-900">
+                      QRIS Belum Didaftarkan untuk Cabang Ini
+                    </h4>
+                    <p class="text-[11px] text-amber-800 max-w-xs mx-auto leading-relaxed">
+                      Upload foto QRIS statis outlet Anda di menu admin agar kasir bisa langsung menghasilkan QRIS dinamis otomatis.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        window.location.hash = '#/metode-pembayaran';
+                      }}
+                      class="inline-block py-1.5 px-3 bg-amber-900 text-white text-[11px] font-bold rounded-lg cursor-pointer hover:bg-amber-800 transition-colors shadow-2xs"
+                    >
+                      Buka Atur Metode Pembayaran ›
+                    </button>
+                  </div>
+                )
               )}
             </div>
 
@@ -508,3 +575,4 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
     </div>
   );
 }
+

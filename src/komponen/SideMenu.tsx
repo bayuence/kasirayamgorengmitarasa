@@ -10,6 +10,7 @@ import {
   IconTambahan,
   IconOutlet,
   IconStruk,
+  IconDompet,
   IconKeluar,
   IconClose,
   IconChevronRight,
@@ -368,6 +369,13 @@ export function SideMenu({ isOpen, onClose, currentRoute }: SideMenuProps) {
               sublabel="Penetapan harga cabang & margin keuntungan"
               aktif={baseRoute === '#/harga-outlet'}
               onClick={() => handlePindah('#/harga-outlet')}
+            />
+            <MenuRow
+              ikon={<IconDompet size={18} />}
+              label="Atur Metode Pembayaran"
+              sublabel="Pecahan uang tunai & QRIS dinamis toko"
+              aktif={baseRoute === '#/metode-pembayaran'}
+              onClick={() => handlePindah('#/metode-pembayaran')}
             />
             <MenuRow
               ikon={<IconStruk size={18} />}

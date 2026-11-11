@@ -10,6 +10,7 @@ import { LayarKelolaTambahan } from './fitur/tambahan/index.js';
 import { LayarKelolaOutlet } from './fitur/outlet/index.js';
 import { LayarHargaOutlet } from './fitur/harga-outlet/index.js';
 import { LayarPengaturanStruk } from './fitur/struk/index.js';
+import { LayarPengaturanPembayaran } from './fitur/pengaturan-pembayaran/index.js';
 import { SideMenu } from './komponen/SideMenu.js';
 import {
   IconKasir,
@@ -100,8 +101,9 @@ export function App() {
       case '#/tambahan':     return <LayarKelolaTambahan />;
       case '#/outlet':       return <LayarKelolaOutlet />;
       case '#/harga-outlet': return <LayarHargaOutlet />;
-      case '#/struk':        return <LayarPengaturanStruk />;
-      case '#/pengaturan':   return <LayarKelolaOutlet />;
+      case '#/struk':              return <LayarPengaturanStruk />;
+      case '#/metode-pembayaran':  return <LayarPengaturanPembayaran />;
+      case '#/pengaturan':         return <LayarKelolaOutlet />;
       default:               return <LayarKasir />;
     }
   };
