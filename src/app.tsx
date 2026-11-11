@@ -215,32 +215,6 @@ export function App() {
               {session?.nama || 'Akun'}
             </span>
           </button>
-
-          {/* Status Sinkron Pill */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              fontSize: '0.6875rem',
-              fontWeight: 600,
-              padding: '3px 8px',
-              borderRadius: '999px',
-              background: isOnline ? '#f0fdf4' : '#f8fafc',
-              color: isOnline ? '#15803d' : '#64748b',
-              border: `1px solid ${isOnline ? '#bbf7d0' : '#e2e8f0'}`,
-            }}
-          >
-            <span
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: isOnline ? (pending > 0 ? '#d97706' : '#16a34a') : '#94a3b8',
-              }}
-            />
-            <span>{!isOnline ? 'Offline' : pending > 0 ? `${pending}` : 'Online'}</span>
-          </div>
         </div>
       </header>
 

@@ -171,21 +171,30 @@ export function LayarKasir() {
     );
   };
 
-  // Thumbnail visual menu clean
+  // Thumbnail visual menu clean (Zoom-out uncropped & modern)
   const renderThumbnail = (p: ProdukItem) => {
     if (p.gambar && (p.gambar.startsWith('data:') || p.gambar.startsWith('http'))) {
-      return <img src={p.gambar} alt={p.paket} class="w-full h-full object-cover" />;
+      return (
+        <div class="w-full h-full flex items-center justify-center bg-white p-2">
+          <img
+            src={p.gambar}
+            alt={p.paket}
+            class="max-w-full max-h-full object-contain"
+            loading="lazy"
+          />
+        </div>
+      );
     }
 
     const teks = `${p.kategori || ''} ${p.varian || ''} ${p.paket || ''}`.toLowerCase();
     const isMinuman = teks.includes('minum') || teks.includes('teh') || teks.includes('jeruk') || teks.includes('kopi');
 
     return (
-      <div class="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400">
+      <div class="w-full h-full flex items-center justify-center bg-slate-50 text-slate-400">
         {isMinuman ? (
-          <IconMinumanPlaceholder size={28} color="#64748b" />
+          <IconMinumanPlaceholder size={22} color="#94a3b8" />
         ) : (
-          <IconPiringSendok size={28} color="#64748b" />
+          <IconPiringSendok size={22} color="#94a3b8" />
         )}
       </div>
     );
@@ -215,64 +224,64 @@ export function LayarKasir() {
       )}
 
       {/* ── 1. Header Bilah Cabang Toko (Sleek Minimal Bar) ── */}
-      <div class="bg-white border-b border-slate-200 px-3.5 py-2.5 flex items-center justify-between gap-2.5 shadow-xs sticky top-0 z-30">
+      <div class="bg-white border-b border-slate-200 px-3 py-2 flex items-center justify-between gap-2 shadow-xs sticky top-0 z-30">
         <button
           type="button"
           onClick={() => setBukaModalCabang(true)}
-          class="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 text-left flex-1 min-w-0 transition-colors"
+          class="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5 text-left flex-1 min-w-0 transition-colors"
         >
           <div class="text-slate-700 shrink-0">
-            <IconToko size={15} color="#334155" />
+            <IconToko size={14} color="#334155" />
           </div>
           <div class="min-w-0 flex-1 overflow-hidden">
             <div class="flex items-center gap-1.5">
               {outletAktifSignal.value?.kode && (
-                <span class="text-[10px] font-extrabold bg-slate-900 text-white px-1.5 py-0.5 rounded tracking-wider shrink-0 uppercase">
+                <span class="text-[9.5px] font-extrabold bg-slate-900 text-white px-1.5 py-0.5 rounded tracking-wider shrink-0 uppercase">
                   {outletAktifSignal.value.kode}
                 </span>
               )}
-              <span class="text-xs font-bold text-slate-900 truncate">
+              <span class="text-[11.5px] font-bold text-slate-900 truncate">
                 {outletAktifSignal.value?.nama || 'Pilih Cabang Kasir'}
               </span>
             </div>
           </div>
-          <IconChevronDown size={13} color="#64748b" className="shrink-0" />
+          <IconChevronDown size={12} color="#64748b" className="shrink-0" />
         </button>
 
         <button
           type="button"
           onClick={() => setBukaModalCabang(true)}
-          class="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200/60 rounded-xl px-2.5 py-1.5 shrink-0 transition-colors flex items-center gap-1"
+          class="text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200/60 rounded-lg px-2 py-1.5 shrink-0 transition-colors flex items-center gap-1"
         >
           <span>Ganti</span>
-          <IconChevronDown size={11} color="currentColor" />
+          <IconChevronDown size={10} color="currentColor" />
         </button>
       </div>
 
       {/* ── 2. Search Bar & Horizontal Category Scroll ── */}
-      <div class="bg-white border-b border-slate-200 pt-2.5 pb-2">
+      <div class="bg-white border-b border-slate-200 pt-2 pb-1.5">
         {/* Kolom Pencarian Cepat */}
-        <div class="px-3.5 mb-2.5">
+        <div class="px-3 mb-2">
           <div class="relative w-full">
-            <div class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none flex items-center justify-center">
-              <IconCari size={14} color="#94a3b8" />
+            <div class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none flex items-center justify-center">
+              <IconCari size={13} color="#94a3b8" />
             </div>
             <input
               type="text"
               placeholder="Cari menu atau paket..."
               value={cariTeks}
               onInput={(e) => setCariTeks((e.target as HTMLInputElement).value)}
-              style={{ paddingLeft: '34px', paddingRight: '32px' }}
-              class="w-full py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-all box-border"
+              style={{ paddingLeft: '30px', paddingRight: '28px' }}
+              class="w-full py-1.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-lg text-[11.5px] font-medium text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-all box-border"
             />
             {cariTeks && (
               <button
                 type="button"
                 onClick={() => setCariTeks('')}
-                class="absolute right-2.5 top-1/2 -translate-y-1/2 bg-slate-200 hover:bg-slate-300 rounded-full w-5 h-5 flex items-center justify-center text-slate-600 transition-colors cursor-pointer"
+                class="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-200 hover:bg-slate-300 rounded-full w-4.5 h-4.5 flex items-center justify-center text-slate-600 transition-colors cursor-pointer"
                 aria-label="Hapus pencarian"
               >
-                <IconTutup size={10} color="#475569" />
+                <IconTutup size={9} color="#475569" />
               </button>
             )}
           </div>
@@ -280,7 +289,7 @@ export function LayarKasir() {
 
         {/* Tab Filter Kategori (Smooth Horizontal Swipeable Capsule Bar) */}
         <div
-          class="flex gap-2 overflow-x-auto px-3.5 pb-1 no-scrollbar w-full max-w-full"
+          class="flex gap-1.5 overflow-x-auto px-3 pb-1 no-scrollbar w-full max-w-full"
           style={{
             WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'none',
@@ -295,13 +304,13 @@ export function LayarKasir() {
               minWidth: 'auto',
               whiteSpace: 'nowrap',
               borderRadius: '9999px',
-              padding: '6px 14px',
-              fontSize: '12px',
+              padding: '4px 11px',
+              fontSize: '11px',
               fontWeight: 700,
               border: kategoriAktif === 'Semua' ? 'none' : '1px solid #e2e8f0',
               backgroundColor: kategoriAktif === 'Semua' ? '#0f172a' : '#f1f5f9',
               color: kategoriAktif === 'Semua' ? '#ffffff' : '#475569',
-              boxShadow: kategoriAktif === 'Semua' ? '0 1px 3px rgba(15,23,42,0.18)' : 'none',
+              boxShadow: kategoriAktif === 'Semua' ? '0 1px 2px rgba(15,23,42,0.15)' : 'none',
               cursor: 'pointer',
               transition: 'all 0.15s ease',
             }}
@@ -321,13 +330,13 @@ export function LayarKasir() {
                   minWidth: 'auto',
                   whiteSpace: 'nowrap',
                   borderRadius: '9999px',
-                  padding: '6px 14px',
-                  fontSize: '12px',
+                  padding: '4px 11px',
+                  fontSize: '11px',
                   fontWeight: isAktif ? 700 : 600,
                   border: isAktif ? 'none' : '1px solid #e2e8f0',
                   backgroundColor: isAktif ? '#0f172a' : '#f1f5f9',
                   color: isAktif ? '#ffffff' : '#475569',
-                  boxShadow: isAktif ? '0 1px 3px rgba(15,23,42,0.18)' : 'none',
+                  boxShadow: isAktif ? '0 1px 2px rgba(15,23,42,0.15)' : 'none',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                 }}
@@ -354,28 +363,28 @@ export function LayarKasir() {
       )}
 
       {/* ── 3. Grid Menu 2 Kolom Kanan-Kiri (Ultra Compact & Modern) ── */}
-      <div class="p-3.5">
+      <div class="p-2.5">
         {produkTersaring.length === 0 ? (
-          <div class="text-center py-16 px-4 bg-white rounded-2xl border border-dashed border-slate-300">
-            <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-              <IconCari size={20} color="#94a3b8" />
+          <div class="text-center py-14 px-4 bg-white rounded-2xl border border-dashed border-slate-300">
+            <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+              <IconCari size={18} color="#94a3b8" />
             </div>
-            <p class="text-sm font-bold text-slate-800 mb-1">Menu Tidak Ditemukan</p>
-            <p class="text-xs text-slate-500 max-w-xs mx-auto">
+            <p class="text-xs font-bold text-slate-800 mb-1">Menu Tidak Ditemukan</p>
+            <p class="text-[11px] text-slate-500 max-w-xs mx-auto">
               Coba ganti kata kunci pencarian atau pilih tab kategori lain di atas.
             </p>
             {cariTeks && (
               <button
                 type="button"
                 onClick={() => setCariTeks('')}
-                class="mt-3 text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
+                class="mt-2.5 text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer"
               >
                 Reset Pencarian
               </button>
             )}
           </div>
         ) : (
-          <div class="grid grid-cols-2 gap-2.5">
+          <div class="grid grid-cols-2 gap-2">
             {produkTersaring.map((p) => {
               const qty = getQty(p.id);
               const cartItem = getItemKeranjang(p.id);
@@ -383,73 +392,73 @@ export function LayarKasir() {
               return (
                 <div
                   key={p.id}
-                  class={`bg-white rounded-2xl overflow-hidden border transition-all flex flex-col justify-between ${
+                  class={`bg-white rounded-xl overflow-hidden border transition-all flex flex-col justify-between ${
                     qty > 0
-                      ? 'border-slate-900 shadow-md ring-1 ring-slate-900/15'
+                      ? 'border-slate-900 shadow-sm ring-1 ring-slate-900/15'
                       : 'border-slate-200 shadow-xs hover:border-slate-300'
                   }`}
                 >
-                  {/* Bagian Visual Gambar (Aspect Square / Ratio Mantap) */}
-                  <div class="relative w-full h-28 bg-slate-100 overflow-hidden shrink-0">
+                  {/* Bagian Visual Gambar (Compact & Zoom-out fit) */}
+                  <div class="relative w-full h-20 bg-slate-50 overflow-hidden shrink-0 border-b border-slate-100 flex items-center justify-center">
                     {renderThumbnail(p)}
 
                     {/* Badge Kategori Mengambang */}
-                    <span class="absolute top-2 left-2 bg-slate-900/75 backdrop-blur-xs text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md tracking-wide uppercase">
+                    <span class="absolute top-1.5 left-1.5 bg-slate-900/80 backdrop-blur-xs text-white text-[8px] font-bold px-1.5 py-0.5 rounded tracking-wide uppercase">
                       {p.kategori || p.varian || 'Menu'}
                     </span>
 
                     {/* Badge Qty Mengambang jika sudah dipesan */}
                     {qty > 0 && (
-                      <span class="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-md tabular-nums">
+                      <span class="absolute top-1.5 right-1.5 bg-emerald-600 text-white text-[9px] font-extrabold w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-xs tabular-nums">
                         {qty}
                       </span>
                     )}
                   </div>
 
                   {/* Konten Keterangan Menu */}
-                  <div class="p-2.5 flex-1 flex flex-col justify-between">
+                  <div class="p-2 flex-1 flex flex-col justify-between">
                     <div>
-                      <h4 class="text-xs font-bold text-slate-900 line-clamp-1 leading-snug">
+                      <h4 class="text-[11px] font-bold text-slate-900 line-clamp-1 leading-tight">
                         {p.paket}
                       </h4>
 
                       {p.isi ? (
-                        <p class="text-[10px] text-slate-500 line-clamp-1 mt-0.5">
+                        <p class="text-[9px] text-slate-500 line-clamp-1 mt-0.5 leading-tight">
                           {p.isi}
                         </p>
                       ) : (
-                        <div class="h-3" />
+                        <div class="h-2" />
                       )}
 
-                      <div class="text-xs sm:text-sm font-extrabold text-slate-900 mt-1 tabular-nums">
+                      <div class="text-[11.5px] font-extrabold text-slate-900 mt-1 tabular-nums">
                         {formatRupiah(p.harga)}
                       </div>
                     </div>
 
                     {/* Tombol Aksi / Stepper di Bawah Kartu */}
-                    <div class="mt-2.5 pt-2 border-t border-slate-100">
+                    <div class="mt-2 pt-1.5 border-t border-slate-100">
                       {qty === 0 ? (
                         <button
                           type="button"
                           onClick={() => handleTambah(p)}
                           style={{
                             width: '100%',
-                            padding: '6px 8px',
+                            padding: '4px 6px',
                             backgroundColor: '#0f172a',
                             color: '#ffffff',
-                            borderRadius: '10px',
-                            fontSize: '11px',
+                            borderRadius: '7px',
+                            fontSize: '10.5px',
                             fontWeight: 700,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '4px',
+                            gap: '3px',
                             cursor: 'pointer',
                             border: 'none',
-                            boxShadow: '0 1px 2px rgba(15,23,42,0.1)',
+                            boxShadow: '0 1px 2px rgba(15,23,42,0.08)',
                           }}
                         >
-                          <IconPlus size={12} color="#ffffff" />
+                          <IconPlus size={11} color="#ffffff" />
                           <span>Tambah</span>
                         </button>
                       ) : (
@@ -462,9 +471,9 @@ export function LayarKasir() {
                               justifyContent: 'space-between',
                               backgroundColor: '#0f172a',
                               color: '#ffffff',
-                              borderRadius: '10px',
-                              padding: '2px 4px',
-                              boxShadow: '0 1px 3px rgba(15,23,42,0.15)',
+                              borderRadius: '7px',
+                              padding: '2px',
+                              boxShadow: '0 1px 2px rgba(15,23,42,0.12)',
                             }}
                           >
                             <button
@@ -472,9 +481,9 @@ export function LayarKasir() {
                               onClick={() => handleKurang(p.id)}
                               aria-label={`Kurangi ${p.paket}`}
                               style={{
-                                width: '26px',
-                                height: '26px',
-                                borderRadius: '6px',
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '5px',
                                 backgroundColor: '#1e293b',
                                 color: '#ffffff',
                                 display: 'flex',
@@ -485,9 +494,9 @@ export function LayarKasir() {
                                 padding: 0,
                               }}
                             >
-                              <IconMinus size={12} color="#ffffff" />
+                              <IconMinus size={10} color="#ffffff" />
                             </button>
-                            <span class="text-xs font-extrabold px-1 text-white tabular-nums">
+                            <span class="text-[10.5px] font-extrabold px-1 text-white tabular-nums">
                               {qty}
                             </span>
                             <button
@@ -495,9 +504,9 @@ export function LayarKasir() {
                               onClick={() => handleTambah(p)}
                               aria-label={`Tambah ${p.paket}`}
                               style={{
-                                width: '26px',
-                                height: '26px',
-                                borderRadius: '6px',
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '5px',
                                 backgroundColor: '#1e293b',
                                 color: '#ffffff',
                                 display: 'flex',
@@ -508,7 +517,7 @@ export function LayarKasir() {
                                 padding: 0,
                               }}
                             >
-                              <IconPlus size={12} color="#ffffff" />
+                              <IconPlus size={10} color="#ffffff" />
                             </button>
                           </div>
 
@@ -519,13 +528,13 @@ export function LayarKasir() {
                               onClick={() => setBukaToppingProdukId(p.id)}
                               style={{
                                 width: '100%',
-                                marginTop: '5px',
-                                padding: '3px 4px',
-                                borderRadius: '6px',
+                                marginTop: '4px',
+                                padding: '2px 4px',
+                                borderRadius: '5px',
                                 border: '1px solid #dbeafe',
                                 backgroundColor: '#eff6ff',
                                 color: '#1d4ed8',
-                                fontSize: '10px',
+                                fontSize: '9px',
                                 fontWeight: 700,
                                 cursor: 'pointer',
                                 textAlign: 'center',
