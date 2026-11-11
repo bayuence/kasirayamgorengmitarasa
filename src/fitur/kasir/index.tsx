@@ -78,6 +78,11 @@ export function LayarKasir({ bukaBayarAwal = false }: LayarKasirProps) {
     }
   }, [itemTerakhirDihapusSignal.value]);
 
+  // Tutup rincian otomatis jika keranjang sudah kosong
+  useEffect(() => {
+    if (totalQtySignal.value === 0) setBukaRincian(false);
+  }, [totalQtySignal.value]);
+
   const notifikasi = (teks: string) => {
     setPesanSukses(teks);
     setTimeout(() => setPesanSukses(''), 2500);
@@ -829,15 +834,16 @@ export function LayarKasir({ bukaBayarAwal = false }: LayarKasirProps) {
 
             <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-100 shrink-0">
               <div>
-                <h3 class="text-base font-bold text-slate-900">Rincian Keranjang</h3>
+                <h3 class="text-base font-bold text-slate-900">Periksa Detail Pesanan</h3>
                 <span class="text-xs text-slate-500">
-                  {totalQtySignal.value} Item Dipesan
+                  Pastikan pesanan sudah benar sebelum membayar • {totalQtySignal.value} item
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setBukaRincian(false)}
                 class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 border-none cursor-pointer"
+                aria-label="Tutup"
               >
                 <IconTutup size={14} color="#475569" />
               </button>
@@ -851,26 +857,54 @@ export function LayarKasir({ bukaBayarAwal = false }: LayarKasirProps) {
                 return (
                   <div
                     key={item.produkId}
-                    class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3 text-xs"
+                    class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs"
                   >
-                    <div>
-                      <strong class="font-bold text-slate-900 block">
-                        {item.qty}x {item.paket}
-                      </strong>
-                      {item.tambahan.length > 0 && (
-                        <span class="text-[11px] text-slate-500 block mt-0.5">
-                          + {item.tambahan.map((t) => t.nama).join(', ')}
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <strong class="font-bold text-slate-900 block">{item.paket}</strong>
+                        <span class="text-[11px] text-slate-500 block tabular-nums">
+                          {formatRupiah(item.harga)} / porsi
                         </span>
-                      )}
-                    </div>
-                    <div class="text-right shrink-0">
-                      <div class="font-bold text-slate-900 tabular-nums">
+                        {item.tambahan.length > 0 && (
+                          <span class="text-[11px] text-slate-500 block mt-0.5">
+                            + {item.tambahan.map((t) => t.nama).join(', ')}
+                          </span>
+                        )}
+                      </div>
+                      <div class="font-bold text-slate-900 tabular-nums shrink-0">
                         {formatRupiah(subtotal)}
+                      </div>
+                    </div>
+
+                    <div class="flex items-center justify-between mt-2.5">
+                      <div class="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleKurang(item.produkId)}
+                          aria-label={`Kurangi ${item.paket}`}
+                          class="w-7 h-7 rounded-md bg-slate-100 hover:bg-slate-200 flex items-center justify-center border-none cursor-pointer"
+                        >
+                          <IconMinus size={12} color="#0f172a" />
+                        </button>
+                        <span class="w-7 text-center text-xs font-extrabold text-slate-900 tabular-nums">
+                          {item.qty}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const p = produkList.find((x) => x.id === item.produkId);
+                            if (p) handleTambah(p);
+                          }}
+                          aria-label={`Tambah ${item.paket}`}
+                          class="w-7 h-7 rounded-md bg-slate-100 hover:bg-slate-200 flex items-center justify-center border-none cursor-pointer"
+                        >
+                          <IconPlus size={12} color="#0f172a" />
+                        </button>
                       </div>
                       <button
                         type="button"
                         onClick={() => hapusItem(item.produkId)}
-                        class="text-[11px] font-semibold text-rose-600 hover:underline mt-0.5 block border-none bg-transparent cursor-pointer"
+                        class="text-[11px] font-semibold text-rose-600 hover:underline border-none bg-transparent cursor-pointer"
                       >
                         Hapus
                       </button>
@@ -878,6 +912,13 @@ export function LayarKasir({ bukaBayarAwal = false }: LayarKasirProps) {
                   </div>
                 );
               })}
+
+              {catatanPesananSignal.value && (
+                <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900">
+                  <strong class="font-bold block mb-0.5">Catatan Pesanan</strong>
+                  {catatanPesananSignal.value}
+                </div>
+              )}
             </div>
 
             <div class="pt-3 mt-2 border-t border-slate-100 flex items-center justify-between shrink-0">
@@ -887,27 +928,35 @@ export function LayarKasir({ bukaBayarAwal = false }: LayarKasirProps) {
               </strong>
             </div>
 
-            <button
-              type="button"
-              style={{
-                marginTop: '12px',
-                width: '100%',
-                padding: '12px',
-                backgroundColor: '#0f172a',
-                color: '#ffffff',
-                borderRadius: '12px',
-                fontWeight: 700,
-                fontSize: '13px',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-              onClick={() => {
-                setBukaRincian(false);
-                setBukaModalBayar(true);
-              }}
-            >
-              Lanjut ke Pembayaran ›
-            </button>
+            <div class="flex gap-2 mt-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setBukaRincian(false)}
+                class="px-3.5 py-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer shrink-0"
+              >
+                Tambah Menu
+              </button>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  backgroundColor: '#0f172a',
+                  color: '#ffffff',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  setBukaRincian(false);
+                  setBukaModalBayar(true);
+                }}
+              >
+                Lanjut Bayar ›
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -977,10 +1026,10 @@ export function LayarKasir({ bukaBayarAwal = false }: LayarKasirProps) {
               border: 'none',
             }}
             onClick={() => {
-              setBukaModalBayar(true);
+              setBukaRincian(true);
             }}
           >
-            Lanjut Bayar ›
+            Lanjut Detail ›
           </button>
         </div>
       )}
