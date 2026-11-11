@@ -108,9 +108,9 @@ export function hapusQrisOutlet(outletId: string): void {
 
 
 /**
- * Urutan tombol nominal tunai di kasir: pecahan yang bisa menutup total saja,
+ * Urutan tombol nominal tunai di kasir: semua pecahan yang disimpan (selain yang sama dengan total),
  * unik, dari terkecil ke terbesar. 'Uang Pas' selalu ditaruh paling kiri oleh tampilan.
  */
 export function urutkanPecahanKasir(pecahan: number[], total: number): number[] {
-  return Array.from(new Set(pecahan.filter((n) => n > total))).sort((a, b) => a - b);
+  return Array.from(new Set(pecahan.filter((n) => n > 0 && n !== total))).sort((a, b) => a - b);
 }
