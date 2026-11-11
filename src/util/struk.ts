@@ -18,6 +18,7 @@ export function formatTeksStruk(
   lines.push('     AYAM GORENG MITARASA');
   lines.push('================================');
   lines.push(`No. Antrean : ${nomorAntrean}`);
+  if (pesanan.kode_transaksi) lines.push(`Kode        : ${pesanan.kode_transaksi}`);
   lines.push(`Tanggal     : ${tanggalFormat}`);
   lines.push(`Kasir       : ${namaKasir}`);
   lines.push('--------------------------------');

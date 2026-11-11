@@ -41,6 +41,28 @@ export async function getNextNomorAntrean(tanggal: string): Promise<number> {
   return nextNomor;
 }
 
+// Bersihkan kode toko untuk dipakai di ID: huruf kecil, hanya a-z dan 0-9
+function bersihkanKodeToko(kode?: string | null): string {
+  const bersih = (kode || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return bersih || 'trx';
+}
+
+// Format: kodetoko + DD + MM + YY + urutan  (mis. lodan1111261 = pesanan ke-1 tgl 11-11-2026)
+export function formatKodeTransaksi(kodeToko: string, tanggal: string, urutan: number): string {
+  const [y, m, d] = tanggal.split('-');
+  return `${bersihkanKodeToko(kodeToko)}${d}${m}${y.slice(-2)}${urutan}`;
+}
+
+// Urutan transaksi per toko per hari (mulai dari 1 setiap hari baru)
+export async function getNextUrutanTransaksi(outletKey: string, tanggal: string): Promise<number> {
+  const db = await getLocalDB();
+  const metaKey = `counter_trx_${outletKey}_${tanggal}`;
+  const meta = await db.get('meta', metaKey);
+  const next = meta && typeof meta.val === 'number' ? meta.val + 1 : 1;
+  await db.put('meta', { key: metaKey, val: next });
+  return next;
+}
+
 export function formatNomorAntrean(kodePerangkat: string, nomor: number): string {
   return `${kodePerangkat}-${String(nomor).padStart(3, '0')}`;
 }
@@ -65,6 +87,7 @@ export interface HasilTransaksi {
   pesanan: PesananItem;
   itemPesanan: ItemPesananDetail[];
   nomorAntreanFormatted: string;
+  kodeTransaksi: string;
 }
 
 export async function simpanTransaksiBaru(
@@ -75,6 +98,9 @@ export async function simpanTransaksiBaru(
   const kodePerangkat = getKodePerangkat();
   const nomor = await getNextNomorAntrean(tanggal);
   const nomorAntreanFormatted = formatNomorAntrean(kodePerangkat, nomor);
+  const outletAktif = outletAktifSignal.value;
+  const urutanTrx = await getNextUrutanTransaksi(outletAktif?.id || 'lokal', tanggal);
+  const kodeTransaksi = formatKodeTransaksi(outletAktif?.kode || kodePerangkat, tanggal, urutanTrx);
 
   const pesananId = crypto.randomUUID();
   const waktuISO = new Date().toISOString();
@@ -87,6 +113,7 @@ export async function simpanTransaksiBaru(
   const dataPesanan: PesananItem = {
     id: pesananId,
     kode_perangkat: kodePerangkat,
+    kode_transaksi: kodeTransaksi,
     nomor,
     tanggal,
     waktu: waktuISO,
@@ -113,6 +140,8 @@ export async function simpanTransaksiBaru(
     tambahan: it.tambahan,
   }));
 
+  const { kode_transaksi: _kodeTrx, ...dataPesananServer } = dataPesanan;
+
   // Simpan ke IndexedDB dalam satu transaksi atomik
   const tx = db.transaction(['pesanan', 'item_pesanan', 'outbox'], 'readwrite');
   await tx.objectStore('pesanan').put(dataPesanan);
@@ -125,7 +154,8 @@ export async function simpanTransaksiBaru(
   const outboxPesanan: OutboxItem = {
     id: crypto.randomUUID(),
     tabel: 'pesanan',
-    data: dataPesanan,
+    // kode_transaksi belum ada kolomnya di server; dikeluarkan agar sinkronisasi tidak gagal
+    data: dataPesananServer,
     waktu: waktuISO,
     status: 'pending',
     percobaan: 0,
@@ -159,6 +189,7 @@ export async function simpanTransaksiBaru(
     pesanan: dataPesanan,
     itemPesanan: dataItems,
     nomorAntreanFormatted,
+    kodeTransaksi,
   };
 }
 

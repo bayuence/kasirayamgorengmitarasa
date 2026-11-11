@@ -189,6 +189,9 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
                 <h1 class="text-4xl font-black text-slate-900 tracking-tight leading-none my-1 tabular-nums">
                   {hasilTransaksi.nomorAntreanFormatted}
                 </h1>
+                <p class="text-[11px] font-mono font-bold text-slate-700 bg-slate-100 inline-block px-2 py-0.5 rounded mb-1">
+                  ID: {hasilTransaksi.kodeTransaksi}
+                </p>
                 <p class="text-xs text-slate-500 font-medium">
                   Nomor Antrean • {new Date(hasilTransaksi.pesanan.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                 </p>
@@ -280,6 +283,7 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
               </div>
               <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', margin: '4px 0' }}>
                 <div>No. Antrean: <strong>{hasilTransaksi.nomorAntreanFormatted}</strong></div>
+                <div>Kode: {hasilTransaksi.kodeTransaksi}</div>
                 <div>Tgl: {new Date(hasilTransaksi.pesanan.waktu).toLocaleString('id-ID')}</div>
                 <div>Kasir: {sessionSignal.value?.nama || 'Kasir'}</div>
               </div>

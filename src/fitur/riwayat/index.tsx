@@ -94,6 +94,7 @@ export function LayarRiwayat() {
     const kataKunci = cari.toLowerCase().trim();
     return (
       item.nomorAntrean.toLowerCase().includes(kataKunci) ||
+      (item.pesanan.kode_transaksi || '').toLowerCase().includes(kataKunci) ||
       String(item.pesanan.nomor).includes(kataKunci) ||
       item.items.some((it) => it.nama_produk.toLowerCase().includes(kataKunci))
     );
@@ -166,6 +167,11 @@ export function LayarRiwayat() {
                       <strong class="tabular-nums" style={{ fontSize: '1.125rem' }}>
                         {item.nomorAntrean}
                       </strong>
+                      {item.pesanan.kode_transaksi && (
+                        <span class="font-mono" style={{ fontSize: '0.6875rem', color: 'var(--muted)' }}>
+                          {item.pesanan.kode_transaksi}
+                        </span>
+                      )}
                       <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>• {waktu}</span>
                       {isBatal && (
                         <span
@@ -240,6 +246,11 @@ export function LayarRiwayat() {
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>
                   {pesananDipilih.nomorAntrean}
                 </h3>
+                {pesananDipilih.pesanan.kode_transaksi && (
+                  <span class="font-mono" style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block' }}>
+                    ID: {pesananDipilih.pesanan.kode_transaksi}
+                  </span>
+                )}
                 <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
                   {new Date(pesananDipilih.pesanan.waktu).toLocaleString('id-ID')}
                 </span>
@@ -465,6 +476,7 @@ export function LayarRiwayat() {
           </div>
           <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', margin: '4px 0' }}>
             <div>No. Antrean: <strong>{pesananDipilih.nomorAntrean}</strong></div>
+            {pesananDipilih.pesanan.kode_transaksi && <div>Kode: {pesananDipilih.pesanan.kode_transaksi}</div>}
             <div>Tgl: {new Date(pesananDipilih.pesanan.waktu).toLocaleString('id-ID')}</div>
             {pesananDipilih.pesanan.status === 'batal' && (
               <div>STATUS: <strong>DIBATALKAN</strong></div>

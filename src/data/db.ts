@@ -67,6 +67,8 @@ export interface HargaTambahanOutletItem {
 export interface PesananItem {
   id: string;
   kode_perangkat: string;
+  /** ID riwayat: kodetoko + DD + MM + YY + urutan hari itu, mis. lodan1111261 */
+  kode_transaksi?: string;
   nomor: number;
   tanggal: string;
   waktu: string;
