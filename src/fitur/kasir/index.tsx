@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { muatMenuLokal } from '../../data/menu.js';
 import { outletAktifSignal } from '../../data/outlet.js';
-import type { ProdukItem, TambahanItem } from '../../data/db.js';
+import type { ProdukItem, TambahanItem, KategoriItem } from '../../data/db.js';
 import { formatRupiah } from '../../util/rupiah.js';
 import {
   itemKeranjangSignal,
@@ -19,16 +19,18 @@ import {
 export function LayarKasir() {
   const [produkList, setProdukList] = useState<ProdukItem[]>([]);
   const [tambahanList, setTambahanList] = useState<TambahanItem[]>([]);
-  const [varianAktif, setVarianAktif] = useState<string>('Ayam Rempah Jawa');
+  const [kategoriList, setKategoriList] = useState<KategoriItem[]>([]);
+  const [kategoriAktif, setKategoriAktif] = useState<string>('Semua');
   const [loading, setLoading] = useState(true);
   const [bukaCatatan, setBukaCatatan] = useState(false);
   const [bukaRincian, setBukaRincian] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    muatMenuLokal(outletAktifSignal.value?.id).then(({ produk, tambahan }) => {
+    muatMenuLokal(outletAktifSignal.value?.id).then(({ produk, tambahan, kategori }) => {
       setProdukList(produk);
       setTambahanList(tambahan);
+      setKategoriList(kategori || []);
       setLoading(false);
     });
   }, [outletAktifSignal.value?.id]);
@@ -43,7 +45,10 @@ export function LayarKasir() {
     }
   }, [itemTerakhirDihapusSignal.value]);
 
-  const produkTampil = produkList.filter((p) => p.varian === varianAktif);
+  const produkTampil =
+    kategoriAktif === 'Semua'
+      ? produkList
+      : produkList.filter((p) => (p.kategori || p.varian) === kategoriAktif);
 
   const getQty = (produkId: string) => {
     const item = itemKeranjangSignal.value.find((i) => i.produkId === produkId);
@@ -222,22 +227,61 @@ export function LayarKasir() {
         </div>
       </div>
 
-      {/* Segmented Control Varian (Sleek Clean Tabs) */}
-      <div class="segmented-control" role="tablist">
+      {/* Tab Filter Kategori Menu Dinamis */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '6px',
+          overflowX: 'auto',
+          padding: '8px 16px',
+          background: '#ffffff',
+          borderBottom: '1px solid var(--line)',
+          scrollbarWidth: 'none',
+        }}
+      >
         <button
           type="button"
-          class={`segmented-btn ${varianAktif === 'Ayam Rempah Jawa' ? 'active' : ''}`}
-          onClick={() => setVarianAktif('Ayam Rempah Jawa')}
+          onClick={() => setKategoriAktif('Semua')}
+          style={{
+            padding: '6px 14px',
+            borderRadius: '999px',
+            fontSize: '0.8125rem',
+            fontWeight: kategoriAktif === 'Semua' ? 700 : 500,
+            background: kategoriAktif === 'Semua' ? 'var(--ink)' : 'var(--soft)',
+            color: kategoriAktif === 'Semua' ? 'var(--surface)' : 'var(--muted)',
+            border: 'none',
+            whiteSpace: 'nowrap',
+            cursor: 'pointer',
+            minHeight: '34px',
+          }}
         >
-          Ayam Rempah Jawa
+          Semua ({produkList.length})
         </button>
-        <button
-          type="button"
-          class={`segmented-btn ${varianAktif === 'Ayam Goreng Bawang Putih' ? 'active' : ''}`}
-          onClick={() => setVarianAktif('Ayam Goreng Bawang Putih')}
-        >
-          Ayam Goreng Bawang Putih
-        </button>
+        {kategoriList.map((k) => {
+          const isAktif = kategoriAktif === k.nama;
+          const count = produkList.filter((p) => (p.kategori || p.varian) === k.nama).length;
+          return (
+            <button
+              key={k.id}
+              type="button"
+              onClick={() => setKategoriAktif(k.nama)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '999px',
+                fontSize: '0.8125rem',
+                fontWeight: isAktif ? 700 : 500,
+                background: isAktif ? 'var(--ink)' : 'var(--soft)',
+                color: isAktif ? 'var(--surface)' : 'var(--muted)',
+                border: 'none',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                minHeight: '34px',
+              }}
+            >
+              {k.nama} ({count})
+            </button>
+          );
+        })}
       </div>
 
       {/* Notifikasi Undo Hapus */}
@@ -281,8 +325,39 @@ export function LayarKasir() {
 
           return (
             <div key={p.id} class="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1, paddingRight: '12px' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                {/* Foto / Icon Menu jika ada */}
+                {p.gambar ? (
+                  <div
+                    style={{
+                      width: '58px',
+                      height: '58px',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                    }}
+                  >
+                    <img src={p.gambar} alt={p.paket} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                ) : null}
+
+                <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                    <span
+                      style={{
+                        fontSize: '0.625rem',
+                        fontWeight: 700,
+                        background: '#f1f5f9',
+                        color: '#475569',
+                        padding: '1px 5px',
+                        borderRadius: '3px',
+                      }}
+                    >
+                      {p.kategori || p.varian}
+                    </span>
+                  </div>
                   <h3 style={{ fontSize: '1.0625rem', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
                     {p.paket}
                   </h3>

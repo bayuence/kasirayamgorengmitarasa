@@ -343,8 +343,8 @@ export function SideMenu({ isOpen, onClose, currentRoute }: SideMenuProps) {
 
             <MenuRow
               ikon={<IconMenu size={18} />}
-              label="Katalog Menu & Produk"
-              sublabel="Atur varian, harga dasar & status"
+              label="Katalog Menu & Kategori"
+              sublabel="Atur foto, kategori, HPP modal & margin"
               aktif={baseRoute === '#/produk'}
               onClick={() => handlePindah('#/produk')}
             />
@@ -364,8 +364,8 @@ export function SideMenu({ isOpen, onClose, currentRoute }: SideMenuProps) {
             />
             <MenuRow
               ikon={<IconKasir size={18} />}
-              label="Atur Harga per Toko"
-              sublabel="Penetapan harga khusus tiap cabang"
+              label="Atur Menu & Harga per Toko"
+              sublabel="Penetapan harga cabang & margin keuntungan"
               aktif={baseRoute === '#/harga-outlet'}
               onClick={() => handlePindah('#/harga-outlet')}
             />

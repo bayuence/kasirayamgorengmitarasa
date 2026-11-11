@@ -1,11 +1,23 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
+export interface KategoriItem {
+  id: string;
+  nama: string;
+  urutan: number;
+  aktif: boolean;
+  diubah_pada: string;
+}
+
 export interface ProdukItem {
   id: string;
-  varian: string;
-  paket: string;
-  isi: string;
-  harga: number;
+  varian: string; // fallback / subgrup
+  paket: string;  // nama menu
+  kategori?: string; // nama kategori
+  kategori_id?: string | null;
+  gambar?: string; // data URL base64 atau image URL
+  hpp?: number;    // Harga Pokok Penjualan / Modal Awal (Rp)
+  harga: number;  // Harga Jual Standar (Rp)
+  isi: string;    // Deskripsi menu / isi paket
   urutan: number;
   aktif: boolean;
   diubah_pada: string;
@@ -38,6 +50,7 @@ export interface HargaProdukOutletItem {
   outlet_id: string;
   produk_id: string;
   harga: number;
+  hpp?: number | null;
   aktif: boolean;
   diubah_pada: string;
 }
@@ -100,6 +113,11 @@ export interface OutboxItem {
 }
 
 export interface MitarasaDBSchema extends DBSchema {
+  kategori: {
+    key: string;
+    value: KategoriItem;
+    indexes: { 'by-urutan': number };
+  };
   produk: {
     key: string;
     value: ProdukItem;
@@ -153,8 +171,13 @@ let dbPromise: Promise<IDBPDatabase<MitarasaDBSchema>> | null = null;
 
 export function getLocalDB(): Promise<IDBPDatabase<MitarasaDBSchema>> {
   if (!dbPromise) {
-    dbPromise = openDB<MitarasaDBSchema>('mitarasa-kasir-db', 2, {
+    dbPromise = openDB<MitarasaDBSchema>('mitarasa-kasir-db', 3, {
       upgrade(db) {
+        // Store kategori
+        if (!db.objectStoreNames.contains('kategori')) {
+          const kategoriStore = db.createObjectStore('kategori', { keyPath: 'id' });
+          kategoriStore.createIndex('by-urutan', 'urutan');
+        }
         // Store produk
         if (!db.objectStoreNames.contains('produk')) {
           const produkStore = db.createObjectStore('produk', { keyPath: 'id' });

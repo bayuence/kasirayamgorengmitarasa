@@ -369,6 +369,7 @@ export async function simpanHargaProdukPerOutlet(
   produkId: string,
   harga: number,
   aktif: boolean = true,
+  hpp?: number | null,
 ): Promise<void> {
   const db = await getLocalDB();
   let foundId: string | null = null;
@@ -386,6 +387,7 @@ export async function simpanHargaProdukPerOutlet(
     outlet_id: outletId,
     produk_id: produkId,
     harga,
+    hpp: hpp !== undefined ? hpp : null,
     aktif,
     diubah_pada: new Date().toISOString(),
   };
