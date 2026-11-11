@@ -7,6 +7,7 @@ import {
   muatSemuaQrisOutlet,
   simpanQrisOutlet,
   hapusQrisOutlet,
+  urutkanPecahanKasir,
   type KonfigurasiTunai,
   type KonfigurasiQrisOutlet,
 } from '../../data/pembayaran.js';
@@ -81,10 +82,6 @@ export function LayarPengaturanPembayaran() {
   };
 
   // ── Handler Tab Tunai ──
-  const handleTerapkanPreset = (preset: number[]) => {
-    setPecahanList([...preset].sort((a, b) => a - b));
-  };
-
   const handleHapusPecahan = (nom: number) => {
     setPecahanList((prev) => prev.filter((p) => p !== nom));
   };
@@ -278,39 +275,6 @@ export function LayarPengaturanPembayaran() {
               Atur pecahan uang yang sering digunakan pelanggan di toko Anda. Tombol ini akan langsung muncul di pop-up pembayaran kasir sehingga kasir bisa langsung klik-klik cepat tanpa mengetik manual.
             </div>
 
-            {/* Rekomendasi Preset Cepat */}
-            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-              <label class="block text-xs font-bold text-slate-900 mb-2">
-                Pilih Preset Cepat:
-              </label>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleTerapkanPreset([10000, 20000, 50000, 100000])}
-                  class="p-2.5 rounded-xl border border-slate-200 hover:border-slate-900 bg-slate-50 hover:bg-white text-left transition-all cursor-pointer"
-                >
-                  <strong class="text-xs font-bold text-slate-900 block">Standar Resto</strong>
-                  <span class="text-[10px] text-slate-500 block mt-0.5">10rb, 20rb, 50rb, 100rb</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleTerapkanPreset([5000, 10000, 20000, 50000, 100000])}
-                  class="p-2.5 rounded-xl border border-slate-200 hover:border-slate-900 bg-slate-50 hover:bg-white text-left transition-all cursor-pointer"
-                >
-                  <strong class="text-xs font-bold text-slate-900 block">Lengkap & Receh</strong>
-                  <span class="text-[10px] text-slate-500 block mt-0.5">5rb, 10rb, 20rb, 50rb, 100rb</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleTerapkanPreset([20000, 50000, 100000])}
-                  class="p-2.5 rounded-xl border border-slate-200 hover:border-slate-900 bg-slate-50 hover:bg-white text-left transition-all cursor-pointer"
-                >
-                  <strong class="text-xs font-bold text-slate-900 block">Kasir Cepat</strong>
-                  <span class="text-[10px] text-slate-500 block mt-0.5">20rb, 50rb, 100rb</span>
-                </button>
-              </div>
-            </div>
-
             {/* Daftar Pecahan Aktif */}
             <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-4">
               <div>
@@ -393,7 +357,7 @@ export function LayarPengaturanPembayaran() {
                     Uang Pas (Rp 33.000)
                   </span>
                 )}
-                {pecahanList.map((nom) => (
+                {urutkanPecahanKasir(pecahanList, 33000).map((nom) => (
                   <span
                     key={nom}
                     class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold tabular-nums"

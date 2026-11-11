@@ -13,6 +13,7 @@ import { simpanTransaksiBaru, type HasilTransaksi } from '../../data/outbox.js';
 import { formatTeksStruk, bagikanStruk } from '../../util/struk.js';
 import {
   konfigurasiTunaiSignal,
+  urutkanPecahanKasir,
   muatQrisOutlet,
   type KonfigurasiQrisOutlet,
 } from '../../data/pembayaran.js';
@@ -88,16 +89,11 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
 
   // Buat opsi pecahan nominal dari pengaturan kebiasaan kasir
   const cfgTunai = konfigurasiTunaiSignal.value;
-  const nominalSaran: number[] = (() => {
-    const list = new Set<number>();
-    if (cfgTunai.tampilkanUangPas) {
-      list.add(total); // Uang pas
-    }
-    for (const nom of cfgTunai.pecahanCepat) {
-      list.add(nom);
-    }
-    return Array.from(list).sort((a, b) => a - b);
-  })();
+  // Urutan: Uang Pas paling kiri, lalu pecahan dari terkecil ke terbesar (hanya yang cukup membayar)
+  const nominalSaran: number[] = [
+    ...(cfgTunai.tampilkanUangPas ? [total] : []),
+    ...urutkanPecahanKasir(cfgTunai.pecahanCepat, total),
+  ];
 
   const handlePilihNominal = (nom: number) => {
     setUangDiterima(nom);
@@ -414,7 +410,7 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
                     </label>
 
                     {/* Tombol Saran Cepat */}
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
+                    <div class="grid grid-cols-3 gap-1.5 mb-2">
                       {nominalSaran.map((nom) => {
                         const isSelected = uangDiterima === nom;
                         return (
