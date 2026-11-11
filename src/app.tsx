@@ -87,16 +87,12 @@ export function App() {
     return <LayarLogin />;
   }
 
-  // ── Halaman bayar — full screen tanpa bottom nav ────────────
-  if (route === '#/bayar') {
-    return <LayarBayar />;
-  }
-
   const baseRoute = route.split('?')[0];
 
   const renderRoute = () => {
     switch (baseRoute) {
       case '#/kasir':        return <LayarKasir />;
+      case '#/bayar':        return <LayarKasir bukaBayarAwal={true} />;
       case '#/riwayat':      return <LayarRiwayat />;
       case '#/shift':        return <LayarShift />;
       case '#/laporan':      return <LayarLaporan />;

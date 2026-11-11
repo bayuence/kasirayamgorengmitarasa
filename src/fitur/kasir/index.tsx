@@ -27,8 +27,13 @@ import {
   IconPiringSendok,
   IconMinumanPlaceholder,
 } from '../../komponen/Icon.js';
+import { ModalPembayaran } from '../bayar/ModalPembayaran.js';
 
-export function LayarKasir() {
+interface LayarKasirProps {
+  bukaBayarAwal?: boolean;
+}
+
+export function LayarKasir({ bukaBayarAwal = false }: LayarKasirProps) {
   const [produkList, setProdukList] = useState<ProdukItem[]>([]);
   const [tambahanList, setTambahanList] = useState<TambahanItem[]>([]);
   const [kategoriList, setKategoriList] = useState<KategoriItem[]>([]);
@@ -36,6 +41,7 @@ export function LayarKasir() {
   const [loading, setLoading] = useState(true);
   const [bukaCatatan, setBukaCatatan] = useState(false);
   const [bukaRincian, setBukaRincian] = useState(false);
+  const [bukaModalBayar, setBukaModalBayar] = useState(bukaBayarAwal);
 
   // Pop-up Ganti Cabang
   const [bukaModalCabang, setBukaModalCabang] = useState(false);
@@ -885,7 +891,7 @@ export function LayarKasir() {
               }}
               onClick={() => {
                 setBukaRincian(false);
-                window.location.hash = '#/bayar';
+                setBukaModalBayar(true);
               }}
             >
               Lanjut ke Pembayaran ›
@@ -959,13 +965,24 @@ export function LayarKasir() {
               border: 'none',
             }}
             onClick={() => {
-              window.location.hash = '#/bayar';
+              setBukaModalBayar(true);
             }}
           >
             Lanjut Bayar ›
           </button>
         </div>
       )}
+
+      {/* ── Pop-Up Modal Pembayaran Fleksibel (Bottom Sheet) ── */}
+      <ModalPembayaran
+        isOpen={bukaModalBayar}
+        onClose={() => {
+          setBukaModalBayar(false);
+          if (window.location.hash === '#/bayar') {
+            window.location.hash = '#/kasir';
+          }
+        }}
+      />
     </div>
   );
 }
