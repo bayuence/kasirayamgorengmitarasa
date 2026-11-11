@@ -149,6 +149,30 @@ const DEFAULT_TAMBAHAN: TambahanItem[] = [
   },
 ];
 
+export function normalkanProduk(p: ProdukItem): ProdukItem {
+  let kat = p.kategori;
+  if (!kat || kat === 'Original' || kat === 'Spicy' || kat === '') {
+    const teks = `${p.varian || ''} ${p.paket || ''}`.toLowerCase();
+    if (teks.includes('minum') || teks.includes('teh') || teks.includes('jeruk') || teks.includes('kopi')) {
+      kat = 'Minuman';
+    } else if (teks.includes('tambahan') || teks.includes('sambal') || teks.includes('sambel') || teks.includes('kremes')) {
+      kat = 'Tambahan & Sambal';
+    } else if (teks.includes('ala carte') || teks.includes('satuan')) {
+      kat = 'Ala Carte / Satuan';
+    } else {
+      kat = 'Paket Ayam';
+    }
+  }
+
+  const hpp = (p.hpp && p.hpp > 0) ? p.hpp : Math.round((p.harga || 15000) * 0.6);
+
+  return {
+    ...p,
+    kategori: kat,
+    hpp,
+  };
+}
+
 /**
  * Kalkulator Keuntungan (Nominal Laba), Margin (%), dan Markup (%)
  */
@@ -291,7 +315,8 @@ export async function muatSemuaMenuAdmin(): Promise<{
 }> {
   const db = await getLocalDB();
   const kategoriList = await muatSemuaKategori();
-  const produkList = await db.getAllFromIndex('produk', 'by-urutan');
+  const rawList = await db.getAllFromIndex('produk', 'by-urutan');
+  const produkList = rawList.map(normalkanProduk);
   const tambahanList = await db.getAllFromIndex('tambahan', 'by-urutan');
   return { produk: produkList, tambahan: tambahanList, kategori: kategoriList };
 }
@@ -311,7 +336,8 @@ export interface ProdukDenganHargaOutlet {
  */
 export async function muatProdukDenganHargaOutlet(outletId: string): Promise<ProdukDenganHargaOutlet[]> {
   const db = await getLocalDB();
-  const produkList = await db.getAllFromIndex('produk', 'by-urutan');
+  const rawList = await db.getAllFromIndex('produk', 'by-urutan');
+  const produkList = rawList.map(normalkanProduk);
   let hargaKhususList: HargaProdukOutletItem[] = [];
   try {
     hargaKhususList = await db.getAllFromIndex('harga_produk_outlet', 'by-outlet', outletId);

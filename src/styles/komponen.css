@@ -113,6 +113,9 @@
   flex-direction: column;
   padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
   -webkit-overflow-scrolling: touch;
 }
 

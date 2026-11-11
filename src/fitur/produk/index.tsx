@@ -219,10 +219,26 @@ export function LayarKelolaProduk() {
     }
   };
 
+  // Helper pencocokan kategori yang toleran
+  const matchesKategori = (p: ProdukItem, katNama: string) => {
+    const k = p.kategori || p.varian || '';
+    if (k.toLowerCase() === katNama.toLowerCase()) return true;
+    if (katNama === 'Paket Ayam') {
+      return !k || k === 'Original' || k === 'Spicy' || k.toLowerCase().includes('ayam') || p.paket?.toLowerCase().includes('paket');
+    }
+    if (katNama === 'Minuman') {
+      return k.toLowerCase().includes('minum') || p.paket?.toLowerCase().includes('teh') || p.paket?.toLowerCase().includes('jeruk');
+    }
+    if (katNama === 'Tambahan & Sambal') {
+      return k.toLowerCase().includes('tambahan') || k.toLowerCase().includes('sambal') || p.paket?.toLowerCase().includes('kremes');
+    }
+    return false;
+  };
+
   // Filter menu
   const produkTersaring = daftarProduk.filter((p) => {
     if (kategoriFilter === 'semua') return true;
-    return (p.kategori || p.varian) === kategoriFilter;
+    return matchesKategori(p, kategoriFilter);
   });
 
   // Perhitungan live keuntungan di modal
@@ -231,7 +247,15 @@ export function LayarKelolaProduk() {
   const liveCalc = hitungKeuntungan(liveJual, liveHpp);
 
   return (
-    <div style={{ padding: '16px 16px 80px', maxWidth: '640px', margin: '0 auto' }}>
+    <div
+      style={{
+        padding: '12px 14px 90px',
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        overflowX: 'hidden',
+      }}
+    >
       {/* Back link */}
       <a
         href="#/kasir"
@@ -463,7 +487,7 @@ export function LayarKelolaProduk() {
               Semua ({daftarProduk.length})
             </button>
             {daftarKategori.map((k) => {
-              const count = daftarProduk.filter((p) => (p.kategori || p.varian) === k.nama).length;
+              const count = daftarProduk.filter((p) => matchesKategori(p, k.nama)).length;
               const isSelected = kategoriFilter === k.nama;
               return (
                 <button

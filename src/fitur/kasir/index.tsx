@@ -45,10 +45,25 @@ export function LayarKasir() {
     }
   }, [itemTerakhirDihapusSignal.value]);
 
+  const matchesKategori = (p: ProdukItem, katNama: string) => {
+    const k = p.kategori || p.varian || '';
+    if (k.toLowerCase() === katNama.toLowerCase()) return true;
+    if (katNama === 'Paket Ayam') {
+      return !k || k === 'Original' || k === 'Spicy' || k.toLowerCase().includes('ayam') || p.paket?.toLowerCase().includes('paket');
+    }
+    if (katNama === 'Minuman') {
+      return k.toLowerCase().includes('minum') || p.paket?.toLowerCase().includes('teh') || p.paket?.toLowerCase().includes('jeruk');
+    }
+    if (katNama === 'Tambahan & Sambal') {
+      return k.toLowerCase().includes('tambahan') || k.toLowerCase().includes('sambal') || p.paket?.toLowerCase().includes('kremes');
+    }
+    return false;
+  };
+
   const produkTampil =
     kategoriAktif === 'Semua'
       ? produkList
-      : produkList.filter((p) => (p.kategori || p.varian) === kategoriAktif);
+      : produkList.filter((p) => matchesKategori(p, kategoriAktif));
 
   const getQty = (produkId: string) => {
     const item = itemKeranjangSignal.value.find((i) => i.produkId === produkId);
@@ -259,7 +274,7 @@ export function LayarKasir() {
         </button>
         {kategoriList.map((k) => {
           const isAktif = kategoriAktif === k.nama;
-          const count = produkList.filter((p) => (p.kategori || p.varian) === k.nama).length;
+          const count = produkList.filter((p) => matchesKategori(p, k.nama)).length;
           return (
             <button
               key={k.id}
