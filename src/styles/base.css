@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* =============================================
    MOBILE-FIRST BASE CSS
    Max lebar konten 480px, tengah di desktop
@@ -56,16 +58,8 @@ button, input, select, textarea {
 
 button {
   cursor: pointer;
-  border: none;
-  background: none;
-  min-height: 48px;
-  min-width: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   user-select: none;
   -webkit-user-select: none;
-  transition: opacity 0.1s ease, background-color 0.1s ease;
 }
 
 button:active {

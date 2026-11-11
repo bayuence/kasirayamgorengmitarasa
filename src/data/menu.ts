@@ -190,7 +190,7 @@ export function hitungKeuntungan(hargaJual: number, hpp: number): {
 }
 
 /**
- * Muat daftar Kategori (IndexedDB + fallback)
+ * Muat daftar Kategori (IndexedDB + fallback), dengan pembersihan duplikat otomatis
  */
 export async function muatSemuaKategori(): Promise<KategoriItem[]> {
   const db = await getLocalDB();
@@ -205,7 +205,78 @@ export async function muatSemuaKategori(): Promise<KategoriItem[]> {
     kategoriList = await db.getAllFromIndex('kategori', 'by-urutan');
   }
 
-  return kategoriList;
+  // De-duplikasi otomatis berdasarkan nama (jika ada id dummy vs id supabase)
+  const mapUnik = new Map<string, KategoriItem>();
+  const idUntukDihapus: string[] = [];
+
+  for (const k of kategoriList) {
+    const key = k.nama.trim().toLowerCase();
+    const existing = mapUnik.get(key);
+    if (!existing) {
+      mapUnik.set(key, k);
+    } else {
+      // Prioritaskan yang memiliki id UUID daripada id 'kat-...'
+      if (existing.id.startsWith('kat-') && !k.id.startsWith('kat-')) {
+        idUntukDihapus.push(existing.id);
+        mapUnik.set(key, k);
+      } else {
+        idUntukDihapus.push(k.id);
+      }
+    }
+  }
+
+  // Bersihkan duplikat di IndexedDB
+  if (idUntukDihapus.length > 0) {
+    try {
+      const tx = db.transaction('kategori', 'readwrite');
+      for (const id of idUntukDihapus) {
+        await tx.objectStore('kategori').delete(id);
+      }
+      await tx.done;
+    } catch {}
+  }
+
+  const hasil = Array.from(mapUnik.values());
+  hasil.sort((a, b) => (a.urutan || 0) - (b.urutan || 0));
+  // Berikan nomor urut yang rapi 1..N
+  return hasil.map((k, idx) => ({ ...k, urutan: idx + 1 }));
+}
+
+/**
+ * Simpan seluruh urutan baru kategori (Drag & Drop / Reorder)
+ */
+export async function simpanUrutanKategori(list: KategoriItem[]): Promise<void> {
+  const db = await getLocalDB();
+  const tx = db.transaction('kategori', 'readwrite');
+
+  const updatedList: KategoriItem[] = [];
+  for (let i = 0; i < list.length; i++) {
+    const item: KategoriItem = {
+      ...list[i],
+      urutan: i + 1,
+      diubah_pada: new Date().toISOString(),
+    };
+    await tx.objectStore('kategori').put(item);
+    updatedList.push(item);
+  }
+  await tx.done;
+
+  if (typeof navigator !== 'undefined' && navigator.onLine) {
+    try {
+      const supabase = await getSupabase();
+      for (const item of updatedList) {
+        await supabase.from('kategori').upsert({
+          id: item.id,
+          nama: item.nama,
+          urutan: item.urutan,
+          aktif: item.aktif,
+          diubah_pada: item.diubah_pada,
+        });
+      }
+    } catch (e) {
+      console.warn('Gagal simpan urutan kategori ke Supabase:', e);
+    }
+  }
 }
 
 /**

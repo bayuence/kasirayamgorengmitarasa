@@ -1,20 +1,32 @@
 import { useState, useEffect } from 'preact/hooks';
 import { muatMenuLokal } from '../../data/menu.js';
-import { outletAktifSignal } from '../../data/outlet.js';
-import type { ProdukItem, TambahanItem, KategoriItem } from '../../data/db.js';
+import { muatSemuaOutlet, pilihOutletAktif, outletAktifSignal } from '../../data/outlet.js';
+import type { ProdukItem, TambahanItem, KategoriItem, OutletItem } from '../../data/db.js';
 import { formatRupiah } from '../../util/rupiah.js';
 import {
   itemKeranjangSignal,
   totalHargaSignal,
   totalQtySignal,
   jenisPesananSignal,
-  setJenisPesanan,
   catatanPesananSignal,
   hapusItem,
   itemTerakhirDihapusSignal,
   batalkanHapusItem,
   bersihkanUndo,
 } from '../../state/keranjang.js';
+import {
+  IconToko,
+  IconCari,
+  IconTutup,
+  IconPlus,
+  IconMinus,
+  IconCheck,
+  IconChevronDown,
+  IconLokasi,
+  IconCatatan,
+  IconPiringSendok,
+  IconMinumanPlaceholder,
+} from '../../komponen/Icon.js';
 
 export function LayarKasir() {
   const [produkList, setProdukList] = useState<ProdukItem[]>([]);
@@ -24,6 +36,21 @@ export function LayarKasir() {
   const [loading, setLoading] = useState(true);
   const [bukaCatatan, setBukaCatatan] = useState(false);
   const [bukaRincian, setBukaRincian] = useState(false);
+
+  // Pop-up Ganti Cabang
+  const [bukaModalCabang, setBukaModalCabang] = useState(false);
+  const [daftarOutlet, setDaftarOutlet] = useState<OutletItem[]>([]);
+
+  // Pop-up Tambahan / Topping untuk item terpilih
+  const [bukaToppingProdukId, setBukaToppingProdukId] = useState<string | null>(null);
+
+  // Pencarian Cepat
+  const [cariTeks, setCariTeks] = useState('');
+  const [pesanSukses, setPesanSukses] = useState('');
+
+  useEffect(() => {
+    muatSemuaOutlet().then(setDaftarOutlet).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -45,6 +72,17 @@ export function LayarKasir() {
     }
   }, [itemTerakhirDihapusSignal.value]);
 
+  const notifikasi = (teks: string) => {
+    setPesanSukses(teks);
+    setTimeout(() => setPesanSukses(''), 2500);
+  };
+
+  const handlePilihCabang = (o: OutletItem) => {
+    pilihOutletAktif(o);
+    setBukaModalCabang(false);
+    notifikasi(`Cabang aktif: ${o.nama}`);
+  };
+
   const matchesKategori = (p: ProdukItem, katNama: string) => {
     const k = p.kategori || p.varian || '';
     if (k.toLowerCase() === katNama.toLowerCase()) return true;
@@ -52,18 +90,28 @@ export function LayarKasir() {
       return !k || k === 'Original' || k === 'Spicy' || k.toLowerCase().includes('ayam') || p.paket?.toLowerCase().includes('paket');
     }
     if (katNama === 'Minuman') {
-      return k.toLowerCase().includes('minum') || p.paket?.toLowerCase().includes('teh') || p.paket?.toLowerCase().includes('jeruk');
+      return k.toLowerCase().includes('minum') || p.paket?.toLowerCase().includes('teh') || p.paket?.toLowerCase().includes('jeruk') || p.paket?.toLowerCase().includes('kopi');
     }
     if (katNama === 'Tambahan & Sambal') {
-      return k.toLowerCase().includes('tambahan') || k.toLowerCase().includes('sambal') || p.paket?.toLowerCase().includes('kremes');
+      return k.toLowerCase().includes('tambahan') || k.toLowerCase().includes('sambal') || k.toLowerCase().includes('sambel') || p.paket?.toLowerCase().includes('kremes');
+    }
+    if (katNama === 'Ala Carte / Satuan') {
+      return k.toLowerCase().includes('ala carte') || k.toLowerCase().includes('satuan');
     }
     return false;
   };
 
-  const produkTampil =
-    kategoriAktif === 'Semua'
-      ? produkList
-      : produkList.filter((p) => matchesKategori(p, kategoriAktif));
+  const produkTersaring = produkList.filter((p) => {
+    const cocokKategori = kategoriAktif === 'Semua' || matchesKategori(p, kategoriAktif);
+    if (!cocokKategori) return false;
+
+    if (!cariTeks.trim()) return true;
+    const q = cariTeks.toLowerCase();
+    const nama = (p.paket || '').toLowerCase();
+    const isi = (p.isi || '').toLowerCase();
+    const kat = (p.kategori || p.varian || '').toLowerCase();
+    return nama.includes(q) || isi.includes(q) || kat.includes(q);
+  });
 
   const getQty = (produkId: string) => {
     const item = itemKeranjangSignal.value.find((i) => i.produkId === produkId);
@@ -123,377 +171,619 @@ export function LayarKasir() {
     );
   };
 
+  // Thumbnail visual menu clean
+  const renderThumbnail = (p: ProdukItem) => {
+    if (p.gambar && (p.gambar.startsWith('data:') || p.gambar.startsWith('http'))) {
+      return <img src={p.gambar} alt={p.paket} class="w-full h-full object-cover" />;
+    }
+
+    const teks = `${p.kategori || ''} ${p.varian || ''} ${p.paket || ''}`.toLowerCase();
+    const isMinuman = teks.includes('minum') || teks.includes('teh') || teks.includes('jeruk') || teks.includes('kopi');
+
+    return (
+      <div class="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400">
+        {isMinuman ? (
+          <IconMinumanPlaceholder size={28} color="#64748b" />
+        ) : (
+          <IconPiringSendok size={28} color="#64748b" />
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
-      <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: '0.9375rem' }}>
-        Memuat katalog menu...
+      <div class="py-20 text-center text-slate-500 text-sm font-medium">
+        <div class="inline-block animate-spin w-7 h-7 border-2 border-slate-300 border-t-slate-900 rounded-full mb-3" />
+        <p>Memuat katalog menu...</p>
       </div>
     );
   }
 
+  // Topping item aktif saat modal topping dibuka
+  const produkToppingAktif = bukaToppingProdukId ? produkList.find((p) => p.id === bukaToppingProdukId) : null;
+  const cartItemToppingAktif = bukaToppingProdukId ? getItemKeranjang(bukaToppingProdukId) : null;
+
   return (
-    <div style={{ paddingBottom: '120px' }}>
-      {/* Banner Cabang Toko Aktif */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '7px 16px',
-          background: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0',
-          fontSize: '0.75rem',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {outletAktifSignal.value?.kode && (
-            <span
-              style={{
-                fontSize: '0.625rem',
-                fontWeight: 700,
-                background: '#0f172a',
-                color: '#ffffff',
-                padding: '1px 5px',
-                borderRadius: '3px',
-                letterSpacing: '0.04em',
-              }}
-            >
-              {outletAktifSignal.value.kode}
-            </span>
-          )}
-          <span style={{ fontWeight: 600, color: '#0f172a' }}>
-            {outletAktifSignal.value?.nama || 'Ayam Goreng Mitarasa'}
-          </span>
+    <div class="w-full max-w-full pb-36 bg-slate-50 min-h-screen">
+      {/* ── Toast Notifikasi Cepat ── */}
+      {pesanSukses && (
+        <div class="fixed top-14 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded-full text-xs font-semibold z-50 shadow-lg flex items-center gap-2">
+          <IconCheck size={14} color="#22c55e" />
+          <span>{pesanSukses}</span>
         </div>
+      )}
 
-        <a
-          href="#/outlet"
-          style={{
-            fontSize: '0.6875rem',
-            color: '#64748b',
-            fontWeight: 600,
-            textDecoration: 'none',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '2px',
-          }}
-        >
-          {outletAktifSignal.value ? 'Ganti Cabang ›' : 'Atur Cabang ›'}
-        </a>
-      </div>
-
-      {/* Pilihan Jenis Pesanan (Clean Toggle) */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '10px 16px',
-          background: 'var(--surface)',
-          borderBottom: '1px solid var(--line)',
-        }}
-      >
-        <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--muted)' }}>Tipe Pesanan:</span>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <button
-            type="button"
-            onClick={() => setJenisPesanan('makan_di_tempat')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-full)',
-              fontSize: '0.8125rem',
-              fontWeight: jenisPesananSignal.value === 'makan_di_tempat' ? 600 : 500,
-              background:
-                jenisPesananSignal.value === 'makan_di_tempat'
-                  ? 'var(--ink)'
-                  : 'var(--soft)',
-              color:
-                jenisPesananSignal.value === 'makan_di_tempat'
-                  ? 'var(--surface)'
-                  : 'var(--muted)',
-              border: 'none',
-              minHeight: '38px',
-            }}
-          >
-            Makan di tempat
-          </button>
-          <button
-            type="button"
-            onClick={() => setJenisPesanan('bawa_pulang')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-full)',
-              fontSize: '0.8125rem',
-              fontWeight: jenisPesananSignal.value === 'bawa_pulang' ? 600 : 500,
-              background:
-                jenisPesananSignal.value === 'bawa_pulang'
-                  ? 'var(--ink)'
-                  : 'var(--soft)',
-              color:
-                jenisPesananSignal.value === 'bawa_pulang'
-                  ? 'var(--surface)'
-                  : 'var(--muted)',
-              border: 'none',
-              minHeight: '38px',
-            }}
-          >
-            Bawa pulang
-          </button>
-        </div>
-      </div>
-
-      {/* Tab Filter Kategori Menu Dinamis */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '6px',
-          overflowX: 'auto',
-          padding: '8px 16px',
-          background: '#ffffff',
-          borderBottom: '1px solid var(--line)',
-          scrollbarWidth: 'none',
-        }}
-      >
+      {/* ── 1. Header Bilah Cabang Toko (Sleek Minimal Bar) ── */}
+      <div class="bg-white border-b border-slate-200 px-3.5 py-2.5 flex items-center justify-between gap-2.5 shadow-xs sticky top-0 z-30">
         <button
           type="button"
-          onClick={() => setKategoriAktif('Semua')}
-          style={{
-            padding: '6px 14px',
-            borderRadius: '999px',
-            fontSize: '0.8125rem',
-            fontWeight: kategoriAktif === 'Semua' ? 700 : 500,
-            background: kategoriAktif === 'Semua' ? 'var(--ink)' : 'var(--soft)',
-            color: kategoriAktif === 'Semua' ? 'var(--surface)' : 'var(--muted)',
-            border: 'none',
-            whiteSpace: 'nowrap',
-            cursor: 'pointer',
-            minHeight: '34px',
-          }}
+          onClick={() => setBukaModalCabang(true)}
+          class="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 text-left flex-1 min-w-0 transition-colors"
         >
-          Semua ({produkList.length})
+          <div class="text-slate-700 shrink-0">
+            <IconToko size={15} color="#334155" />
+          </div>
+          <div class="min-w-0 flex-1 overflow-hidden">
+            <div class="flex items-center gap-1.5">
+              {outletAktifSignal.value?.kode && (
+                <span class="text-[10px] font-extrabold bg-slate-900 text-white px-1.5 py-0.5 rounded tracking-wider shrink-0 uppercase">
+                  {outletAktifSignal.value.kode}
+                </span>
+              )}
+              <span class="text-xs font-bold text-slate-900 truncate">
+                {outletAktifSignal.value?.nama || 'Pilih Cabang Kasir'}
+              </span>
+            </div>
+          </div>
+          <IconChevronDown size={13} color="#64748b" className="shrink-0" />
         </button>
-        {kategoriList.map((k) => {
-          const isAktif = kategoriAktif === k.nama;
-          const count = produkList.filter((p) => matchesKategori(p, k.nama)).length;
-          return (
-            <button
-              key={k.id}
-              type="button"
-              onClick={() => setKategoriAktif(k.nama)}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '999px',
-                fontSize: '0.8125rem',
-                fontWeight: isAktif ? 700 : 500,
-                background: isAktif ? 'var(--ink)' : 'var(--soft)',
-                color: isAktif ? 'var(--surface)' : 'var(--muted)',
-                border: 'none',
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-                minHeight: '34px',
-              }}
-            >
-              {k.nama} ({count})
-            </button>
-          );
-        })}
+
+        <button
+          type="button"
+          onClick={() => setBukaModalCabang(true)}
+          class="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200/60 rounded-xl px-2.5 py-1.5 shrink-0 transition-colors flex items-center gap-1"
+        >
+          <span>Ganti</span>
+          <IconChevronDown size={11} color="currentColor" />
+        </button>
       </div>
 
-      {/* Notifikasi Undo Hapus */}
-      {itemTerakhirDihapusSignal.value && (
+      {/* ── 2. Search Bar & Horizontal Category Scroll ── */}
+      <div class="bg-white border-b border-slate-200 pt-2.5 pb-2">
+        {/* Kolom Pencarian Cepat */}
+        <div class="px-3.5 mb-2.5">
+          <div class="relative w-full">
+            <div class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none flex items-center justify-center">
+              <IconCari size={14} color="#94a3b8" />
+            </div>
+            <input
+              type="text"
+              placeholder="Cari menu atau paket..."
+              value={cariTeks}
+              onInput={(e) => setCariTeks((e.target as HTMLInputElement).value)}
+              style={{ paddingLeft: '34px', paddingRight: '32px' }}
+              class="w-full py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-all box-border"
+            />
+            {cariTeks && (
+              <button
+                type="button"
+                onClick={() => setCariTeks('')}
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 bg-slate-200 hover:bg-slate-300 rounded-full w-5 h-5 flex items-center justify-center text-slate-600 transition-colors cursor-pointer"
+                aria-label="Hapus pencarian"
+              >
+                <IconTutup size={10} color="#475569" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Tab Filter Kategori (Smooth Horizontal Swipeable Capsule Bar) */}
         <div
+          class="flex gap-2 overflow-x-auto px-3.5 pb-1 no-scrollbar w-full max-w-full"
           style={{
-            margin: '0 16px 12px',
-            padding: '10px 14px',
-            background: 'var(--surface)',
-            border: '1px solid var(--line)',
-            borderRadius: 'var(--radius)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '0.875rem',
-            boxShadow: 'var(--shadow-sm)',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            touchAction: 'pan-x',
           }}
         >
-          <span style={{ color: 'var(--ink-secondary)' }}>Item dihapus dari keranjang</span>
+          <button
+            type="button"
+            onClick={() => setKategoriAktif('Semua')}
+            style={{
+              flexShrink: 0,
+              minWidth: 'auto',
+              whiteSpace: 'nowrap',
+              borderRadius: '9999px',
+              padding: '6px 14px',
+              fontSize: '12px',
+              fontWeight: 700,
+              border: kategoriAktif === 'Semua' ? 'none' : '1px solid #e2e8f0',
+              backgroundColor: kategoriAktif === 'Semua' ? '#0f172a' : '#f1f5f9',
+              color: kategoriAktif === 'Semua' ? '#ffffff' : '#475569',
+              boxShadow: kategoriAktif === 'Semua' ? '0 1px 3px rgba(15,23,42,0.18)' : 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Semua ({produkList.length})
+          </button>
+          {kategoriList.map((k) => {
+            const isAktif = kategoriAktif === k.nama;
+            const count = produkList.filter((p) => matchesKategori(p, k.nama)).length;
+            return (
+              <button
+                key={k.id}
+                type="button"
+                onClick={() => setKategoriAktif(k.nama)}
+                style={{
+                  flexShrink: 0,
+                  minWidth: 'auto',
+                  whiteSpace: 'nowrap',
+                  borderRadius: '9999px',
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: isAktif ? 700 : 600,
+                  border: isAktif ? 'none' : '1px solid #e2e8f0',
+                  backgroundColor: isAktif ? '#0f172a' : '#f1f5f9',
+                  color: isAktif ? '#ffffff' : '#475569',
+                  boxShadow: isAktif ? '0 1px 3px rgba(15,23,42,0.18)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {k.nama} ({count})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Notifikasi Undo Hapus Item ── */}
+      {itemTerakhirDihapusSignal.value && (
+        <div class="mx-3.5 mt-2.5 p-3 bg-white border border-slate-200 rounded-xl shadow-xs flex items-center justify-between text-xs">
+          <span class="text-slate-600 font-medium">Item dihapus dari keranjang</span>
           <button
             type="button"
             onClick={batalkanHapusItem}
-            style={{
-              color: 'var(--ink)',
-              fontWeight: 700,
-              padding: '4px 8px',
-              minHeight: '36px',
-              textDecoration: 'underline',
-            }}
+            class="text-blue-600 font-bold hover:underline cursor-pointer"
           >
             Urungkan
           </button>
         </div>
       )}
 
-      {/* Daftar Paket Menu */}
-      <div style={{ padding: '0 16px' }}>
-        {produkTampil.map((p) => {
-          const qty = getQty(p.id);
-          const cartItem = getItemKeranjang(p.id);
+      {/* ── 3. Grid Menu 2 Kolom Kanan-Kiri (Ultra Compact & Modern) ── */}
+      <div class="p-3.5">
+        {produkTersaring.length === 0 ? (
+          <div class="text-center py-16 px-4 bg-white rounded-2xl border border-dashed border-slate-300">
+            <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+              <IconCari size={20} color="#94a3b8" />
+            </div>
+            <p class="text-sm font-bold text-slate-800 mb-1">Menu Tidak Ditemukan</p>
+            <p class="text-xs text-slate-500 max-w-xs mx-auto">
+              Coba ganti kata kunci pencarian atau pilih tab kategori lain di atas.
+            </p>
+            {cariTeks && (
+              <button
+                type="button"
+                onClick={() => setCariTeks('')}
+                class="mt-3 text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
+              >
+                Reset Pencarian
+              </button>
+            )}
+          </div>
+        ) : (
+          <div class="grid grid-cols-2 gap-2.5">
+            {produkTersaring.map((p) => {
+              const qty = getQty(p.id);
+              const cartItem = getItemKeranjang(p.id);
 
-          return (
-            <div key={p.id} class="card">
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                {/* Foto / Icon Menu jika ada */}
-                {p.gambar ? (
-                  <div
-                    style={{
-                      width: '58px',
-                      height: '58px',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      flexShrink: 0,
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                    }}
-                  >
-                    <img src={p.gambar} alt={p.paket} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </div>
-                ) : null}
+              return (
+                <div
+                  key={p.id}
+                  class={`bg-white rounded-2xl overflow-hidden border transition-all flex flex-col justify-between ${
+                    qty > 0
+                      ? 'border-slate-900 shadow-md ring-1 ring-slate-900/15'
+                      : 'border-slate-200 shadow-xs hover:border-slate-300'
+                  }`}
+                >
+                  {/* Bagian Visual Gambar (Aspect Square / Ratio Mantap) */}
+                  <div class="relative w-full h-28 bg-slate-100 overflow-hidden shrink-0">
+                    {renderThumbnail(p)}
 
-                <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                    <span
-                      style={{
-                        fontSize: '0.625rem',
-                        fontWeight: 700,
-                        background: '#f1f5f9',
-                        color: '#475569',
-                        padding: '1px 5px',
-                        borderRadius: '3px',
-                      }}
-                    >
-                      {p.kategori || p.varian}
+                    {/* Badge Kategori Mengambang */}
+                    <span class="absolute top-2 left-2 bg-slate-900/75 backdrop-blur-xs text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md tracking-wide uppercase">
+                      {p.kategori || p.varian || 'Menu'}
                     </span>
-                  </div>
-                  <h3 style={{ fontSize: '1.0625rem', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
-                    {p.paket}
-                  </h3>
-                  <p style={{ color: 'var(--muted)', fontSize: '0.8125rem', marginTop: '3px', lineHeight: 1.4 }}>
-                    {p.isi}
-                  </p>
-                  <p
-                    class="tabular-nums"
-                    style={{ fontWeight: 700, color: 'var(--ink)', marginTop: '8px', fontSize: '1.0625rem' }}
-                  >
-                    {formatRupiah(p.harga)}
-                  </p>
-                </div>
 
-                {/* Stepper +/- */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {qty > 0 && (
-                    <>
-                      <button
-                        type="button"
-                        class="btn-stepper"
-                        onClick={() => handleKurang(p.id)}
-                        aria-label={`Kurangi ${p.paket}`}
-                      >
-                        −
-                      </button>
-                      <span class="tabular-nums" style={{ fontWeight: 700, minWidth: '24px', textAlign: 'center', fontSize: '1.0625rem' }}>
+                    {/* Badge Qty Mengambang jika sudah dipesan */}
+                    {qty > 0 && (
+                      <span class="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-md tabular-nums">
                         {qty}
                       </span>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    class="btn-stepper"
-                    onClick={() => handleTambah(p)}
-                    aria-label={`Tambah ${p.paket}`}
-                  >
-                    +
-                  </button>
+                    )}
+                  </div>
+
+                  {/* Konten Keterangan Menu */}
+                  <div class="p-2.5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h4 class="text-xs font-bold text-slate-900 line-clamp-1 leading-snug">
+                        {p.paket}
+                      </h4>
+
+                      {p.isi ? (
+                        <p class="text-[10px] text-slate-500 line-clamp-1 mt-0.5">
+                          {p.isi}
+                        </p>
+                      ) : (
+                        <div class="h-3" />
+                      )}
+
+                      <div class="text-xs sm:text-sm font-extrabold text-slate-900 mt-1 tabular-nums">
+                        {formatRupiah(p.harga)}
+                      </div>
+                    </div>
+
+                    {/* Tombol Aksi / Stepper di Bawah Kartu */}
+                    <div class="mt-2.5 pt-2 border-t border-slate-100">
+                      {qty === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => handleTambah(p)}
+                          style={{
+                            width: '100%',
+                            padding: '6px 8px',
+                            backgroundColor: '#0f172a',
+                            color: '#ffffff',
+                            borderRadius: '10px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                            border: 'none',
+                            boxShadow: '0 1px 2px rgba(15,23,42,0.1)',
+                          }}
+                        >
+                          <IconPlus size={12} color="#ffffff" />
+                          <span>Tambah</span>
+                        </button>
+                      ) : (
+                        <div>
+                          <div
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              backgroundColor: '#0f172a',
+                              color: '#ffffff',
+                              borderRadius: '10px',
+                              padding: '2px 4px',
+                              boxShadow: '0 1px 3px rgba(15,23,42,0.15)',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleKurang(p.id)}
+                              aria-label={`Kurangi ${p.paket}`}
+                              style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '6px',
+                                backgroundColor: '#1e293b',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                border: 'none',
+                                padding: 0,
+                              }}
+                            >
+                              <IconMinus size={12} color="#ffffff" />
+                            </button>
+                            <span class="text-xs font-extrabold px-1 text-white tabular-nums">
+                              {qty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleTambah(p)}
+                              aria-label={`Tambah ${p.paket}`}
+                              style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '6px',
+                                backgroundColor: '#1e293b',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                border: 'none',
+                                padding: 0,
+                              }}
+                            >
+                              <IconPlus size={12} color="#ffffff" />
+                            </button>
+                          </div>
+
+                          {/* Tombol Topping / Tambahan jika tersedia */}
+                          {tambahanList.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setBukaToppingProdukId(p.id)}
+                              style={{
+                                width: '100%',
+                                marginTop: '5px',
+                                padding: '3px 4px',
+                                borderRadius: '6px',
+                                border: '1px solid #dbeafe',
+                                backgroundColor: '#eff6ff',
+                                color: '#1d4ed8',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                textAlign: 'center',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {cartItem?.tambahan.length ? `✓ ${cartItem.tambahan.length} Tambahan` : '+ Tambahan'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Pop-Up Modal: Pilih Cabang Kasir (Modern Bottom Sheet) ── */}
+      {bukaModalCabang && (
+        <div class="sheet-backdrop" onClick={() => setBukaModalCabang(false)}>
+          <div
+            class="sheet no-scrollbar p-5 rounded-t-3xl max-w-md bg-white shadow-2xl flex flex-col max-h-[82vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-3 shrink-0" />
+
+            <div class="flex items-start justify-between mb-3 shrink-0">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
+                  <IconToko size={18} color="#0f172a" />
+                </div>
+                <div>
+                  <h3 class="text-base font-bold text-slate-900">Pilih Cabang Kasir</h3>
+                  <p class="text-xs text-slate-500">Pilih lokasi outlet yang aktif melayani pesanan</p>
                 </div>
               </div>
 
-              {/* Chip Tambahan (Modern Pill Badges) */}
-              {qty > 0 && (
-                <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--line)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: '8px' }}>
-                    Pilihan Tambahan:
-                  </span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {tambahanList.map((t) => {
-                      const isSelected = cartItem?.tambahan.some((tb) => tb.nama === t.nama);
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => toggleTambahan(p.id, t)}
-                          style={{
-                            padding: '6px 12px',
-                            borderRadius: 'var(--radius-full)',
-                            fontSize: '0.75rem',
-                            minHeight: '38px',
-                            border: isSelected ? '1px solid var(--ink)' : '1px solid var(--line)',
-                            background: isSelected ? 'var(--ink)' : 'var(--surface)',
-                            color: isSelected ? 'var(--surface)' : 'var(--ink)',
-                            fontWeight: isSelected ? 600 : 500,
-                            boxShadow: 'var(--shadow-sm)',
-                          }}
-                        >
-                          {isSelected ? '✓ ' : '+ '}{t.nama} (+{formatRupiah(t.harga)})
-                        </button>
-                      );
-                    })}
-                  </div>
+              <button
+                type="button"
+                onClick={() => setBukaModalCabang(false)}
+                class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer border-none"
+                aria-label="Tutup"
+              >
+                <IconTutup size={14} color="#475569" />
+              </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-2 py-1 no-scrollbar">
+              {daftarOutlet.length === 0 ? (
+                <div class="text-center py-8 text-xs text-slate-500">
+                  Belum ada cabang terdaftar di sistem.
                 </div>
+              ) : (
+                daftarOutlet.map((o) => {
+                  const isAktif = o.id === outletAktifSignal.value?.id;
+                  return (
+                    <div
+                      key={o.id}
+                      onClick={() => handlePilihCabang(o)}
+                      class={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between gap-3 ${
+                        isAktif
+                          ? 'border-slate-900 bg-slate-50 shadow-xs ring-1 ring-slate-900/10'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div
+                          class={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                            isAktif ? 'border-slate-900 bg-slate-900' : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {isAktif && <div class="w-2 h-2 rounded-full bg-white" />}
+                        </div>
+
+                        <div class="min-w-0">
+                          <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-sm font-bold text-slate-900">{o.nama}</span>
+                            {o.kode && (
+                              <span class="text-[10px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded tracking-wide uppercase">
+                                {o.kode}
+                              </span>
+                            )}
+                            {o.sumber === 'presensi' && (
+                              <span class="text-[10px] font-semibold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
+                                Presensi
+                              </span>
+                            )}
+                          </div>
+                          {o.alamat && (
+                            <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5 truncate">
+                              <IconLokasi size={11} color="#94a3b8" />
+                              <span class="truncate">{o.alamat}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {isAktif && (
+                        <span class="shrink-0 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                          Aktif
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
-          );
-        })}
-      </div>
 
-      {/* Dialog Catatan Pesanan */}
-      {bukaCatatan && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.4)',
-            backdropFilter: 'blur(2px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-            zIndex: 40,
-          }}
-        >
+            <div class="pt-3 mt-2 border-t border-slate-100 text-center shrink-0">
+              <a
+                href="#/outlet"
+                onClick={() => setBukaModalCabang(false)}
+                class="text-xs font-bold text-blue-600 hover:underline inline-flex items-center gap-1"
+              >
+                <span>Kelola atau Tambah Cabang Baru</span>
+                <span class="text-sm">›</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Pop-Up Modal: Pilih Tambahan / Topping untuk Menu ── */}
+      {bukaToppingProdukId && produkToppingAktif && (
+        <div class="sheet-backdrop z-40" onClick={() => setBukaToppingProdukId(null)}>
           <div
-            class="card"
-            style={{ width: '100%', maxWidth: '380px', margin: 0, background: 'var(--surface)', boxShadow: 'var(--shadow-lg)' }}
+            class="sheet no-scrollbar p-5 rounded-t-3xl max-w-md bg-white shadow-2xl flex flex-col max-h-[75vh]"
+            onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '8px' }}>Catatan Pesanan</h3>
+            <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-3 shrink-0" />
+
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">Pilihan Tambahan / Sambal</h3>
+                <p class="text-xs text-slate-500 truncate max-w-xs">{produkToppingAktif.paket}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBukaToppingProdukId(null)}
+                class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer border-none"
+              >
+                <IconTutup size={14} color="#475569" />
+              </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-2 py-1 no-scrollbar">
+              {tambahanList.map((t) => {
+                const isSelected = cartItemToppingAktif?.tambahan.some((tb) => tb.nama === t.nama);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggleTambahan(produkToppingAktif.id, t)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '12px',
+                      border: isSelected ? '1.5px solid #0f172a' : '1px solid #e2e8f0',
+                      backgroundColor: isSelected ? '#f8fafc' : '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div class="flex items-center gap-2">
+                      <div
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '4px',
+                          backgroundColor: isSelected ? '#0f172a' : '#f1f5f9',
+                          border: isSelected ? 'none' : '1px solid #cbd5e1',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {isSelected && <IconCheck size={11} color="#ffffff" />}
+                      </div>
+                      <span class="text-xs font-bold text-slate-900">{t.nama}</span>
+                    </div>
+                    <span class="text-xs font-extrabold text-slate-900 tabular-nums">
+                      +{formatRupiah(t.harga)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setBukaToppingProdukId(null)}
+              style={{
+                marginTop: '12px',
+                width: '100%',
+                padding: '10px',
+                backgroundColor: '#0f172a',
+                color: '#ffffff',
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '12px',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Selesai Memilih
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Dialog Catatan Pesanan ── */}
+      {bukaCatatan && (
+        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div class="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2 text-slate-900">
+                <IconCatatan size={16} color="#0f172a" />
+                <h3 class="text-sm font-bold">Catatan Pesanan</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBukaCatatan(false)}
+                class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 border-none cursor-pointer"
+              >
+                <IconTutup size={12} color="#475569" />
+              </button>
+            </div>
+            <p class="text-xs text-slate-500 mb-2">Tuliskan permintaan khusus pelanggan (misal: sambal dipisah, paha bawah):</p>
             <textarea
               rows={3}
-              placeholder="Contoh: Sambel dipisah, ayam bagian paha"
+              placeholder="Ketik catatan di sini..."
               value={catatanPesananSignal.value}
               onInput={(e) => {
                 catatanPesananSignal.value = (e.target as HTMLTextAreaElement).value;
               }}
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: 'var(--radius)',
-                border: '1px solid var(--line)',
-                background: 'var(--surface)',
-                marginBottom: '14px',
-                fontSize: '0.9375rem',
-              }}
+              class="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-900 focus:outline-hidden focus:border-slate-900 focus:bg-white transition-all mb-3 box-border"
             />
             <button
               type="button"
-              class="btn-primary"
               onClick={() => setBukaCatatan(false)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: '#0f172a',
+                color: '#ffffff',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: 700,
+                border: 'none',
+                cursor: 'pointer',
+              }}
             >
               Simpan Catatan
             </button>
@@ -501,114 +791,120 @@ export function LayarKasir() {
         </div>
       )}
 
-      {/* Bottom Sheet Rincian Keranjang */}
+      {/* ── Bottom Sheet Rincian Keranjang ── */}
       {bukaRincian && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.4)',
-            backdropFilter: 'blur(2px)',
-            display: 'flex',
-            alignItems: 'flex-end',
-            zIndex: 35,
-          }}
-        >
+        <div class="sheet-backdrop z-45" onClick={() => setBukaRincian(false)}>
           <div
-            style={{
-              width: '100%',
-              background: 'var(--surface)',
-              borderTopLeftRadius: '20px',
-              borderTopRightRadius: '20px',
-              padding: '20px 16px calc(20px + env(safe-area-inset-bottom, 0px))',
-              maxHeight: '80vh',
-              overflowY: 'auto',
-              boxShadow: 'var(--shadow-lg)',
-            }}
+            class="sheet no-scrollbar p-5 rounded-t-3xl max-w-md bg-white shadow-2xl flex flex-col max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 700 }}>Rincian Keranjang</h3>
+            <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-3 shrink-0" />
+
+            <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 class="text-base font-bold text-slate-900">Rincian Keranjang</h3>
+                <span class="text-xs text-slate-500">
+                  {totalQtySignal.value} Item Dipesan
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => setBukaRincian(false)}
-                style={{ fontSize: '0.875rem', color: 'var(--muted)', minHeight: '36px', fontWeight: 500 }}
+                class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 border-none cursor-pointer"
               >
-                Tutup
+                <IconTutup size={14} color="#475569" />
               </button>
             </div>
 
-            {itemKeranjangSignal.value.map((item) => {
-              const totalTambahan = item.tambahan.reduce((sum, t) => sum + t.harga * t.qty, 0);
-              const subtotal = (item.harga + totalTambahan) * item.qty;
+            <div class="flex-1 overflow-y-auto space-y-2 py-1 no-scrollbar">
+              {itemKeranjangSignal.value.map((item) => {
+                const totalTambahan = item.tambahan.reduce((sum, t) => sum + t.harga * t.qty, 0);
+                const subtotal = (item.harga + totalTambahan) * item.qty;
 
-              return (
-                <div
-                  key={item.produkId}
-                  style={{
-                    padding: '10px 0',
-                    borderBottom: '1px solid var(--line)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <div>
-                    <strong style={{ fontSize: '0.9375rem' }}>{item.qty}x {item.varian} - {item.paket}</strong>
-                    {item.tambahan.length > 0 && (
-                      <div style={{ fontSize: '0.8125rem', color: 'var(--muted)', marginTop: '2px' }}>
-                        + {item.tambahan.map((t) => t.nama).join(', ')}
+                return (
+                  <div
+                    key={item.produkId}
+                    class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div>
+                      <strong class="font-bold text-slate-900 block">
+                        {item.qty}x {item.paket}
+                      </strong>
+                      {item.tambahan.length > 0 && (
+                        <span class="text-[11px] text-slate-500 block mt-0.5">
+                          + {item.tambahan.map((t) => t.nama).join(', ')}
+                        </span>
+                      )}
+                    </div>
+                    <div class="text-right shrink-0">
+                      <div class="font-bold text-slate-900 tabular-nums">
+                        {formatRupiah(subtotal)}
                       </div>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => hapusItem(item.produkId)}
+                        class="text-[11px] font-semibold text-rose-600 hover:underline mt-0.5 block border-none bg-transparent cursor-pointer"
+                      >
+                        Hapus
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div class="tabular-nums" style={{ fontWeight: 600 }}>{formatRupiah(subtotal)}</div>
-                    <button
-                      type="button"
-                      onClick={() => hapusItem(item.produkId)}
-                      style={{ fontSize: '0.8125rem', color: 'var(--danger)', padding: 0, minHeight: '24px' }}
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
 
-            <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.9375rem', color: 'var(--muted)' }}>Total Pembayaran:</span>
-              <strong class="tabular-nums" style={{ fontSize: '1.25rem', color: 'var(--ink)' }}>
+            <div class="pt-3 mt-2 border-t border-slate-100 flex items-center justify-between shrink-0">
+              <span class="text-xs font-semibold text-slate-600">Total Pembayaran:</span>
+              <strong class="text-base font-extrabold text-slate-900 tabular-nums">
                 {formatRupiah(totalHargaSignal.value)}
               </strong>
             </div>
 
             <button
               type="button"
-              class="btn-primary"
-              style={{ marginTop: '16px' }}
+              style={{
+                marginTop: '12px',
+                width: '100%',
+                padding: '12px',
+                backgroundColor: '#0f172a',
+                color: '#ffffff',
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '13px',
+                border: 'none',
+                cursor: 'pointer',
+              }}
               onClick={() => {
                 setBukaRincian(false);
                 window.location.hash = '#/bayar';
               }}
             >
-              Lanjut ke Pembayaran
+              Lanjut ke Pembayaran ›
             </button>
           </div>
         </div>
       )}
 
-      {/* Bilah Keranjang Melekat di Bawah */}
+      {/* ── Bilah Keranjang Melekat di Bawah (Floating Action Bar) ── */}
       {totalQtySignal.value > 0 && (
         <div class="bottom-bar">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div class="flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={() => setBukaRincian(true)}
-              style={{ padding: 0, color: 'var(--ink)', textAlign: 'left', minHeight: '38px' }}
+              style={{
+                textAlign: 'left',
+                cursor: 'pointer',
+                padding: 0,
+                border: 'none',
+                background: 'transparent',
+              }}
             >
-              <div style={{ fontWeight: 600, fontSize: '0.9375rem' }}>
-                {totalQtySignal.value} item
+              <div class="text-xs font-extrabold text-slate-900">
+                {totalQtySignal.value} Item
               </div>
-              <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--muted)' }}>
-                {jenisPesananSignal.value === 'makan_di_tempat' ? 'Makan di tempat' : 'Bawa pulang'} • <span style={{ textDecoration: 'underline' }}>Lihat rincian</span>
+              <span class="text-[11px] text-blue-600 underline font-semibold block">
+                Lihat Rincian Keranjang
               </span>
             </button>
 
@@ -616,32 +912,48 @@ export function LayarKasir() {
               type="button"
               onClick={() => setBukaCatatan(true)}
               style={{
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                color: 'var(--ink)',
-                border: '1px solid var(--line)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '6px 10px',
-                background: 'var(--soft)',
-                minHeight: '36px',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#334155',
+                backgroundColor: '#f1f5f9',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                padding: '5px 8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                cursor: 'pointer',
               }}
             >
-              {catatanPesananSignal.value ? 'Catatan ✓' : '+ Catatan'}
+              <IconCatatan size={12} color="#475569" />
+              <span>{catatanPesananSignal.value ? 'Catatan ✓' : 'Catatan'}</span>
             </button>
 
-            <span class="tabular-nums" style={{ fontSize: '1.1875rem', fontWeight: 700, color: 'var(--ink)' }}>
+            <span class="text-sm font-extrabold text-slate-900 tabular-nums">
               {formatRupiah(totalHargaSignal.value)}
             </span>
           </div>
 
           <button
             type="button"
-            class="btn-primary"
+            style={{
+              width: '100%',
+              marginTop: '10px',
+              padding: '12px',
+              backgroundColor: '#0f172a',
+              color: '#ffffff',
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontWeight: 800,
+              boxShadow: '0 2px 8px rgba(15,23,42,0.2)',
+              cursor: 'pointer',
+              border: 'none',
+            }}
             onClick={() => {
               window.location.hash = '#/bayar';
             }}
           >
-            Lanjut Bayar
+            Lanjut Bayar ›
           </button>
         </div>
       )}
