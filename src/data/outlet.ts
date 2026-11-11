@@ -1,6 +1,7 @@
 import { signal } from '@preact/signals';
 import { getLocalDB, type OutletItem, type HargaProdukOutletItem } from './db.js';
 import { getSupabase } from './supabase.js';
+import { muatDaftarLokasiPresensi } from './presensi.js';
 
 export interface ProfilOutletLokal {
   kodePerangkat: string;
@@ -241,8 +242,10 @@ export async function imporOutletDariPresensi(
   customNama?: string
 ): Promise<OutletItem> {
   const cleanName = lokasi.name.trim();
-  const namaOutlet = customNama || (cleanName.toLowerCase().includes('mitarasa') ? cleanName : `Ayam Goreng Mitarasa - ${cleanName}`);
-  const kodeOutlet = (customKode || cleanName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)).toUpperCase();
+  // Hilangkan duplikasi kata "Ayam Goreng" jika di Presensi sudah ada
+  const subName = cleanName.replace(/^(Ayam\s*Goreng\s*Mitarasa|Ayam\s*Goreng|Mitarasa)\s*[-:]*\s*/i, '').trim();
+  const namaOutlet = customNama || (subName ? `Ayam Goreng Mitarasa - ${subName}` : `Ayam Goreng Mitarasa - ${cleanName}`);
+  const kodeOutlet = (customKode || (subName || cleanName).replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)).toUpperCase();
 
   const item: OutletItem = {
     id: lokasi.id || crypto.randomUUID(),
@@ -250,7 +253,7 @@ export async function imporOutletDariPresensi(
     nama: namaOutlet,
     alamat: `Lokasi Presensi: ${cleanName}`,
     telepon: '',
-    catatan_struk: `Terima kasih atas kunjungan Anda di Mitarasa ${cleanName}!`,
+    catatan_struk: `Terima kasih atas kunjungan Anda di Mitarasa ${subName || cleanName}!`,
     aktif: true,
     sumber: 'presensi',
     presensi_location_id: lokasi.id,
@@ -259,6 +262,42 @@ export async function imporOutletDariPresensi(
 
   await simpanOutletAdmin(item);
   return item;
+}
+
+/**
+ * Sinkronisasi pembaruan nama cabang dari Presensi Donattour
+ */
+export async function sinkronkanCabangDariPresensi(): Promise<{ diubah: number; daftar: string[] }> {
+  const outlets = await muatSemuaOutlet();
+  const presensiList = await muatDaftarLokasiPresensi();
+  const mapPresensi = new Map(presensiList.map((p) => [p.id, p]));
+
+  let diubah = 0;
+  const daftar: string[] = [];
+
+  for (const o of outlets) {
+    if (o.sumber === 'presensi' && o.presensi_location_id) {
+      const loc = mapPresensi.get(o.presensi_location_id);
+      if (loc) {
+        const cleanName = loc.name.trim();
+        const subName = cleanName.replace(/^(Ayam\s*Goreng\s*Mitarasa|Ayam\s*Goreng|Mitarasa)\s*[-:]*\s*/i, '').trim();
+        const namaTerbaru = subName ? `Ayam Goreng Mitarasa - ${subName}` : `Ayam Goreng Mitarasa - ${cleanName}`;
+        const kodeTerbaru = (subName || cleanName).replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
+
+        if (o.nama !== namaTerbaru || o.kode !== kodeTerbaru) {
+          o.nama = namaTerbaru;
+          o.kode = kodeTerbaru;
+          o.alamat = `Lokasi Presensi: ${cleanName}`;
+          o.diubah_pada = new Date().toISOString();
+          await simpanOutletAdmin(o);
+          diubah++;
+          daftar.push(namaTerbaru);
+        }
+      }
+    }
+  }
+
+  return { diubah, daftar };
 }
 
 export async function hapusOutletAdmin(id: string): Promise<void> {

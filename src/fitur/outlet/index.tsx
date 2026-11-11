@@ -4,6 +4,7 @@ import {
   simpanOutletAdmin,
   hapusOutletAdmin,
   imporOutletDariPresensi,
+  sinkronkanCabangDariPresensi,
   outletAktifSignal,
   pilihOutletAktif,
 } from '../../data/outlet.js';
@@ -36,6 +37,7 @@ export function LayarKelolaOutlet() {
   const [lokasiPresensi, setLokasiPresensi] = useState<LokasiPresensi[]>([]);
   const [loadingPresensi, setLoadingPresensi] = useState(false);
   const [imporLoadingId, setImporLoadingId] = useState<string | null>(null);
+  const [loadingSync, setLoadingSync] = useState(false);
 
   useEffect(() => {
     muatData();
@@ -46,11 +48,38 @@ export function LayarKelolaOutlet() {
     try {
       const data = await muatSemuaOutlet();
       setDaftarOutlet(data || []);
+
+      // Jika ada cabang dari Presensi dan perangkat sedang online, sinkronkan otomatis di latar belakang
+      if (data && data.some((o) => o.sumber === 'presensi') && navigator.onLine) {
+        sinkronkanCabangDariPresensi().then((res) => {
+          if (res.diubah > 0) {
+            muatSemuaOutlet().then((fresh) => setDaftarOutlet(fresh || []));
+          }
+        }).catch(() => {});
+      }
     } catch (e) {
       console.warn('Gagal muat outlet:', e);
       setDaftarOutlet([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSinkronkanPresensi = async () => {
+    setLoadingSync(true);
+    try {
+      const res = await sinkronkanCabangDariPresensi();
+      if (res.diubah > 0) {
+        notifikasi(`Berhasil memperbarui ${res.diubah} cabang dari Presensi: ${res.daftar.join(', ')}`);
+      } else {
+        notifikasi('Semua data cabang sudah sinkron dengan Presensi Donattour');
+      }
+      const data = await muatSemuaOutlet();
+      setDaftarOutlet(data || []);
+    } catch (err: any) {
+      alert(`Gagal sinkronisasi: ${err.message || 'Periksa jaringan internet'}`);
+    } finally {
+      setLoadingSync(false);
     }
   };
 
@@ -184,7 +213,7 @@ export function LayarKelolaOutlet() {
       </a>
 
       {/* Header Halaman */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px', gap: '8px' }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
             Lokasi & Cabang Toko
@@ -194,32 +223,73 @@ export function LayarKelolaOutlet() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => handleBukaTambah('manual')}
-          style={{
-            padding: '8px 14px',
-            background: '#0f172a',
-            color: '#ffffff',
-            borderRadius: '6px',
-            fontSize: '0.8125rem',
-            fontWeight: 600,
-            border: 'none',
-            cursor: 'pointer',
-            minHeight: '36px',
-            minWidth: 'auto',
-            whiteSpace: 'nowrap',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          <span>Tambah Cabang</span>
-        </button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {daftarOutlet.some((o) => o.sumber === 'presensi') && (
+            <button
+              type="button"
+              disabled={loadingSync}
+              onClick={handleSinkronkanPresensi}
+              title="Sinkronkan pembaruan nama cabang dari Presensi"
+              style={{
+                padding: '8px 12px',
+                background: '#eff6ff',
+                color: '#1d4ed8',
+                borderRadius: '6px',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                border: '1px solid #bfdbfe',
+                cursor: loadingSync ? 'not-allowed' : 'pointer',
+                minHeight: '36px',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ animation: loadingSync ? 'spin 1s linear infinite' : 'none' }}
+              >
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+              </svg>
+              <span>{loadingSync ? 'Sinkron...' : 'Sinkron Presensi'}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => handleBukaTambah('manual')}
+            style={{
+              padding: '8px 14px',
+              background: '#0f172a',
+              color: '#ffffff',
+              borderRadius: '6px',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              border: 'none',
+              cursor: 'pointer',
+              minHeight: '36px',
+              minWidth: 'auto',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span>Tambah Cabang</span>
+          </button>
+        </div>
       </div>
 
       {pesanSukses && (
