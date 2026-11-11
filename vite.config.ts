@@ -9,12 +9,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png'],
       manifest: {
-        name: 'Ayam Goreng Mitarasa',
-        short_name: 'Mitarasa',
+        name: 'Kasir Ayam Goreng Mitarasa',
+        short_name: 'Kasir Ayam Goreng Mitarasa',
         description: 'Aplikasi Kasir Mobile Ayam Goreng Mitarasa',
         start_url: '/',
         theme_color: '#0f172a',
-        background_color: '#f8fafc',
+        background_color: '#fdf7e8',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
