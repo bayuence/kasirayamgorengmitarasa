@@ -9,14 +9,8 @@ export interface ItemKeranjang {
   tambahan: Array<{ nama: string; harga: number; qty: number }>;
 }
 
-const DEFAULT_JENIS =
-  (typeof localStorage !== 'undefined' &&
-    (localStorage.getItem('mitarasa_last_jenis_pesanan') as
-      | 'makan_di_tempat'
-      | 'bawa_pulang')) ||
-  'makan_di_tempat';
-
-export const jenisPesananSignal = signal<'makan_di_tempat' | 'bawa_pulang'>(DEFAULT_JENIS);
+// Jenis pesanan tidak lagi ditampilkan; nilai tetap dipakai agar kompatibel dengan kolom database.
+export const jenisPesananSignal = signal<'makan_di_tempat' | 'bawa_pulang'>('makan_di_tempat');
 export const catatanPesananSignal = signal<string>('');
 export const itemKeranjangSignal = signal<ItemKeranjang[]>([]);
 export const itemTerakhirDihapusSignal = signal<{

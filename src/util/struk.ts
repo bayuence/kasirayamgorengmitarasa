@@ -12,7 +12,6 @@ export function formatTeksStruk(
     dateStyle: 'short',
     timeStyle: 'short',
   });
-  const tipe = pesanan.jenis === 'makan_di_tempat' ? 'Makan di tempat' : 'Bawa pulang';
 
   let lines: string[] = [];
   lines.push('================================');
@@ -20,7 +19,6 @@ export function formatTeksStruk(
   lines.push('================================');
   lines.push(`No. Antrean : ${nomorAntrean}`);
   lines.push(`Tanggal     : ${tanggalFormat}`);
-  lines.push(`Tipe        : ${tipe}`);
   lines.push(`Kasir       : ${namaKasir}`);
   lines.push('--------------------------------');
 

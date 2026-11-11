@@ -466,7 +466,6 @@ export function LayarRiwayat() {
           <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', margin: '4px 0' }}>
             <div>No. Antrean: <strong>{pesananDipilih.nomorAntrean}</strong></div>
             <div>Tgl: {new Date(pesananDipilih.pesanan.waktu).toLocaleString('id-ID')}</div>
-            <div>Tipe: {pesananDipilih.pesanan.jenis === 'makan_di_tempat' ? 'Makan di tempat' : 'Bawa pulang'}</div>
             {pesananDipilih.pesanan.status === 'batal' && (
               <div>STATUS: <strong>DIBATALKAN</strong></div>
             )}

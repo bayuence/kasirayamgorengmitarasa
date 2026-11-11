@@ -190,9 +190,6 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
                 <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2">
                   <IconCheck size={24} color="#16a34a" />
                 </div>
-                <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 uppercase tracking-wider mb-1">
-                  {hasilTransaksi.pesanan.jenis === 'makan_di_tempat' ? 'Makan di Tempat' : 'Bawa Pulang'}
-                </span>
                 <h1 class="text-4xl font-black text-slate-900 tracking-tight leading-none my-1 tabular-nums">
                   {hasilTransaksi.nomorAntreanFormatted}
                 </h1>
@@ -288,7 +285,6 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
               <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', margin: '4px 0' }}>
                 <div>No. Antrean: <strong>{hasilTransaksi.nomorAntreanFormatted}</strong></div>
                 <div>Tgl: {new Date(hasilTransaksi.pesanan.waktu).toLocaleString('id-ID')}</div>
-                <div>Tipe: {hasilTransaksi.pesanan.jenis === 'makan_di_tempat' ? 'Makan di tempat' : 'Bawa pulang'}</div>
                 <div>Kasir: {sessionSignal.value?.nama || 'Kasir'}</div>
               </div>
               <div style={{ margin: '4px 0' }}>
@@ -366,7 +362,7 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
                     {formatRupiah(total)}
                   </strong>
                   <span class="text-[10px] text-slate-600 mt-0.5 block font-medium">
-                    {items.length} jenis paket • {jenis === 'makan_di_tempat' ? 'Makan di tempat' : 'Bawa pulang'}
+                    {items.length} jenis paket
                   </span>
                 </div>
                 <button
