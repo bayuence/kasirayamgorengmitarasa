@@ -1,0 +1,353 @@
+/* =============================================
+   KOMPONEN — Mobile-First
+   ============================================= */
+
+/* ── ANIMATION DRAWER ── */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* ── TOP BAR (mini header di atas) ─────────── */
+.app-header {
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex-shrink: 0;
+}
+
+.brand-title {
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+/* ── STATUS SINKRON ─────────────────────────── */
+.status-indicator {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: var(--soft);
+}
+
+.status-indicator::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+}
+
+.status-indicator.offline::before { background: var(--muted); }
+.status-indicator.pending::before { background: var(--accent); }
+
+/* ── BOTTOM NAV BAR (mobile tab bar) ───────── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  display: flex;
+  z-index: 40;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+}
+
+.bottom-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 4px;
+  min-height: 56px;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  min-width: unset;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.bottom-nav-btn.active {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.bottom-nav-icon {
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+/* ── HALAMAN UTAMA (dengan padding bawah untuk bottom nav) */
+.page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── BUTTONS ────────────────────────────────── */
+.btn-primary {
+  background-color: var(--brand);
+  color: var(--brand-contrast);
+  font-weight: 600;
+  font-size: 1rem;
+  border-radius: var(--radius);
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 16px;
+  text-align: center;
+  border: none;
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary:active:not(:disabled) {
+  opacity: 0.85;
+}
+
+.btn-secondary {
+  background-color: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-height: 48px;
+  padding: 10px 16px;
+}
+
+.btn-danger {
+  background-color: var(--danger);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border-radius: var(--radius);
+  min-height: 48px;
+  padding: 10px 16px;
+  width: 100%;
+  border: none;
+}
+
+.btn-stepper {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  background: var(--soft);
+  color: var(--ink);
+  font-size: 1.25rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+/* ── CARDS ──────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 10px;
+}
+
+/* ── SECTION PADDING ────────────────────────── */
+.section {
+  padding: 16px;
+}
+
+.section + .section {
+  padding-top: 0;
+}
+
+/* ── SEGMENTED CONTROL ──────────────────────── */
+.segmented-control {
+  display: flex;
+  background: var(--soft);
+  border-radius: var(--radius);
+  padding: 4px;
+  gap: 4px;
+  margin: 0 16px 12px;
+}
+
+.segmented-btn {
+  flex: 1;
+  text-align: center;
+  border-radius: calc(var(--radius) - 3px);
+  padding: 9px 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--muted);
+  min-height: 40px;
+  background: none;
+  border: none;
+}
+
+.segmented-btn.active {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* ── STICKY BOTTOM ACTION BAR ───────────────── */
+.bottom-bar {
+  position: fixed;
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 30;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+}
+
+/* ── CHIPS / TAGS ───────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  min-height: 36px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.1s ease;
+}
+
+.chip.active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
+/* ── LIST ITEM ──────────────────────────────── */
+.list-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  gap: 12px;
+  background: var(--surface);
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+/* ── INPUT GROUP ────────────────────────────── */
+.input-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  margin-bottom: 6px;
+}
+
+/* ── BOTTOM SHEET ───────────────────────────── */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.sheet {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  padding: 0 0 calc(16px + env(safe-area-inset-bottom, 0px));
+  max-height: 85vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--line-strong);
+  border-radius: 2px;
+  margin: 12px auto 16px;
+}
+
+/* ── PRINT STRUK 58MM ───────────────────────── */
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    display: block !important;
+  }
+
+  #app {
+    box-shadow: none !important;
+    max-width: none !important;
+  }
+
+  .app-header,
+  .bottom-nav,
+  .bottom-bar,
+  .no-print,
+  button {
+    display: none !important;
+  }
+
+  .struk-print-area {
+    display: block !important;
+    width: 48mm !important;
+    max-width: 58mm !important;
+    margin: 0 auto !important;
+    padding: 2mm 0 !important;
+    font-family: monospace, sans-serif !important;
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+    color: #000 !important;
+  }
+}

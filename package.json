@@ -1,0 +1,39 @@
+{
+  "name": "ayamgorengmitarasa",
+  "version": "1.0.0",
+  "description": "Aplikasi Kasir Mitarasa (PWA + Supabase)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts"
+  },
+  "keywords": [
+    "kasir",
+    "pwa",
+    "supabase",
+    "drizzle-orm"
+  ],
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^26.6.6",
+    "dotenv": "^18.0.9",
+    "drizzle-kit": "^0.31.11",
+    "drizzle-orm": "^0.45.4",
+    "postgres": "^4.1.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "vite-plugin-pwa": "^2.0.0"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.11.4",
+    "@supabase/supabase-js": "^2.119.0",
+    "idb": "^8.0.4",
+    "preact": "^11.2.0"
+  }
+}
