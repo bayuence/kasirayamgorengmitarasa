@@ -3,7 +3,7 @@ import { LayarLogin } from './fitur/login/index.js';
 import { LayarKasir } from './fitur/kasir/index.js';
 import { LayarBayar } from './fitur/bayar/index.js';
 import { LayarRiwayat } from './fitur/riwayat/index.js';
-import { LayarShift } from './fitur/shift/index.js';
+import { LayarUangAwal } from './fitur/uang-awal/index.js';
 import { LayarLaporan } from './fitur/laporan/index.js';
 import { LayarKelolaProduk } from './fitur/produk/index.js';
 import { LayarKelolaTambahan } from './fitur/tambahan/index.js';
@@ -15,7 +15,7 @@ import { SideMenu } from './komponen/SideMenu.js';
 import {
   IconKasir,
   IconRiwayat,
-  IconShift,
+  IconUangAwal,
   IconLaporan,
 } from './komponen/Ikon.js';
 import { statusSinkronSignal, pendingOutboxCountSignal } from './state/sinkron.js';
@@ -24,21 +24,26 @@ import { inisialisasiSinkronisasiOtomatis } from './data/sync.js';
 
 // ── Tab Konfigurasi Bottom Nav (Hanya Operasional Kasir Utama) ──
 const TABS = [
-  { hash: '#/kasir',   label: 'Kasir',   ikon: IconKasir },
-  { hash: '#/riwayat', label: 'Riwayat', ikon: IconRiwayat },
-  { hash: '#/shift',   label: 'Shift',   ikon: IconShift },
-  { hash: '#/laporan', label: 'Laporan', ikon: IconLaporan },
+  { hash: '#/kasir',     label: 'Kasir',     ikon: IconKasir },
+  { hash: '#/riwayat',   label: 'Riwayat',   ikon: IconRiwayat },
+  { hash: '#/uang-awal', label: 'Uang Awal', ikon: IconUangAwal },
+  { hash: '#/laporan',   label: 'Laporan',   ikon: IconLaporan },
 ];
 
 export function App() {
   const [route, setRoute] = useState<string>(() => {
     const session = inisialisasiSesi() || sessionSignal.value;
     if (!session) return '#/login';
-    if (window.location.hash === '#/login' || !window.location.hash) {
+    let h = window.location.hash;
+    if (h === '#/shift') {
+      window.location.hash = '#/uang-awal';
+      return '#/uang-awal';
+    }
+    if (h === '#/login' || !h) {
       window.location.hash = '#/kasir';
       return '#/kasir';
     }
-    return window.location.hash;
+    return h;
   });
 
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
@@ -52,7 +57,11 @@ export function App() {
     }
 
     const handleHashChange = () => {
-      const h = window.location.hash || '#/kasir';
+      let h = window.location.hash || '#/kasir';
+      if (h === '#/shift') {
+        window.location.hash = '#/uang-awal';
+        h = '#/uang-awal';
+      }
       if (!sessionSignal.value) {
         if (h !== '#/login') {
           window.location.hash = '#/login';
@@ -114,7 +123,8 @@ export function App() {
       case '#/kasir':        return <LayarKasir />;
       case '#/bayar':        return <LayarKasir bukaBayarAwal={true} />;
       case '#/riwayat':      return <LayarRiwayat />;
-      case '#/shift':        return <LayarShift />;
+      case '#/uang-awal':
+      case '#/shift':        return <LayarUangAwal />;
       case '#/laporan':      return <LayarLaporan />;
       case '#/produk':       return <LayarKelolaProduk />;
       case '#/tambahan':     return <LayarKelolaTambahan />;

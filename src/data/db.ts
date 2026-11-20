@@ -98,12 +98,23 @@ export interface ItemPesananDetail {
 export interface ShiftItem {
   id: string;
   kasir_id: string;
-  buka_pada: string;
-  tutup_pada?: string | null;
+  kasir_nama?: string;
+  tanggal?: string; // YYYY-MM-DD
+  buka_pada: string; // ISO 8601 lengkap dengan jam:menit:detik
+  tutup_pada?: string | null; // ISO 8601 lengkap dengan jam:menit:detik
   kas_awal: number;
   kas_akhir?: number | null;
   selisih?: number | null;
+  total_tunai?: number;
+  total_qris?: number;
+  jumlah_pesanan?: number;
+  catatan?: string | null;
+  sumber_dana?: string | null;
+  rincian_pecahan?: Record<string, number> | null;
 }
+
+// Alias untuk nama fitur baru
+export type UangAwalItem = ShiftItem;
 
 export interface OutboxItem {
   id: string;

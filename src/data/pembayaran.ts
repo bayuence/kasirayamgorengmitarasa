@@ -1,4 +1,5 @@
 import { signal } from '@preact/signals';
+import { getSupabase } from './supabase.js';
 
 /**
  * Pengaturan Pembayaran (Tunai & QRIS Dinamis)
@@ -15,7 +16,7 @@ export interface KonfigurasiQrisOutlet {
   qrisPayload: string; // Payload EMVCo asli dari QRIS statis
   merchantName?: string;
   merchantCity?: string;
-  qrisImage?: string; // Preview foto QRIS toko
+  qrisImage?: string; // Preview foto QRIS toko (terkompresi ringan)
   diubahPada: string;
 }
 
@@ -50,15 +51,28 @@ export function muatKonfigurasiTunai(): KonfigurasiTunai {
 }
 
 /**
- * Simpan konfigurasi pecahan uang tunai
+ * Simpan konfigurasi pecahan uang tunai (ke LocalStorage & Cloud Supabase)
  */
-export function simpanKonfigurasiTunai(cfg: KonfigurasiTunai): void {
+export async function simpanKonfigurasiTunai(cfg: KonfigurasiTunai): Promise<void> {
   const bersih: KonfigurasiTunai = {
     pecahanCepat: Array.from(new Set(cfg.pecahanCepat.filter((n) => n > 0))).sort((a, b) => a - b),
     tampilkanUangPas: cfg.tampilkanUangPas ?? true,
   };
   localStorage.setItem(KUNCI_STORAGE_TUNAI, JSON.stringify(bersih));
   konfigurasiTunaiSignal.value = bersih;
+
+  if (typeof navigator !== 'undefined' && navigator.onLine) {
+    try {
+      const supabase = await getSupabase();
+      await supabase.from('pengaturan_toko').upsert({
+        kunci: KUNCI_STORAGE_TUNAI,
+        nilai: bersih,
+        diubah_pada: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.warn('Gagal sinkron konfigurasi tunai ke Supabase:', e);
+    }
+  }
 }
 
 /**
@@ -78,15 +92,21 @@ export function muatSemuaQrisOutlet(): Record<string, KonfigurasiQrisOutlet> {
  * Ambil data QRIS spesifik untuk satu outlet/cabang
  */
 export function muatQrisOutlet(outletId?: string | null): KonfigurasiQrisOutlet | null {
-  if (!outletId) return null;
   const semua = muatSemuaQrisOutlet();
-  return semua[outletId] || null;
+  if (outletId && semua[outletId]) return semua[outletId];
+  if (semua['utama']) return semua['utama'];
+  // Fallback: jika outletId tidak cocok / belum dipilih, gunakan QRIS yang sudah tersimpan
+  const keys = Object.keys(semua);
+  if (keys.length > 0) {
+    return semua[keys[0]];
+  }
+  return null;
 }
 
 /**
- * Simpan konfigurasi QRIS statis untuk cabang tertentu
+ * Simpan konfigurasi QRIS statis untuk cabang tertentu (ke LocalStorage & Cloud Supabase)
  */
-export function simpanQrisOutlet(cfg: KonfigurasiQrisOutlet): void {
+export async function simpanQrisOutlet(cfg: KonfigurasiQrisOutlet): Promise<void> {
   const semua = muatSemuaQrisOutlet();
   semua[cfg.outletId] = {
     ...cfg,
@@ -94,18 +114,100 @@ export function simpanQrisOutlet(cfg: KonfigurasiQrisOutlet): void {
   };
   localStorage.setItem(KUNCI_STORAGE_QRIS, JSON.stringify(semua));
   daftarQrisOutletSignal.value = { ...semua };
+
+  if (typeof navigator !== 'undefined' && navigator.onLine) {
+    try {
+      const supabase = await getSupabase();
+      // 1. Simpan ke tabel pengaturan_toko agar aman dan tersinkron ke semua perangkat
+      await supabase.from('pengaturan_toko').upsert({
+        kunci: KUNCI_STORAGE_QRIS,
+        nilai: semua,
+        diubah_pada: new Date().toISOString(),
+      });
+
+      // 2. Jika bukan outletId 'utama', sinkronkan juga ke tabel outlet
+      if (cfg.outletId && cfg.outletId !== 'utama') {
+        await supabase
+          .from('outlet')
+          .update({
+            qris_payload: cfg.qrisPayload,
+            qris_merchant_name: cfg.merchantName || cfg.outletNama,
+            qris_merchant_city: cfg.merchantCity || 'Indonesia',
+            qris_image: cfg.qrisImage || '',
+            diubah_pada: new Date().toISOString(),
+          })
+          .eq('id', cfg.outletId);
+      }
+    } catch (e) {
+      console.warn('Gagal sinkron konfigurasi QRIS ke Supabase:', e);
+    }
+  }
 }
 
 /**
- * Hapus data QRIS untuk cabang tertentu
+ * Hapus data QRIS untuk cabang tertentu (dari LocalStorage & Cloud Supabase)
  */
-export function hapusQrisOutlet(outletId: string): void {
+export async function hapusQrisOutlet(outletId: string): Promise<void> {
   const semua = muatSemuaQrisOutlet();
   delete semua[outletId];
   localStorage.setItem(KUNCI_STORAGE_QRIS, JSON.stringify(semua));
   daftarQrisOutletSignal.value = { ...semua };
+
+  if (typeof navigator !== 'undefined' && navigator.onLine) {
+    try {
+      const supabase = await getSupabase();
+      await supabase.from('pengaturan_toko').upsert({
+        kunci: KUNCI_STORAGE_QRIS,
+        nilai: semua,
+        diubah_pada: new Date().toISOString(),
+      });
+
+      if (outletId && outletId !== 'utama') {
+        await supabase
+          .from('outlet')
+          .update({
+            qris_payload: null,
+            qris_merchant_name: null,
+            qris_merchant_city: null,
+            qris_image: null,
+            diubah_pada: new Date().toISOString(),
+          })
+          .eq('id', outletId);
+      }
+    } catch (e) {
+      console.warn('Gagal hapus konfigurasi QRIS dari Supabase:', e);
+    }
+  }
 }
 
+/**
+ * Sinkronkan pengaturan pembayaran (QRIS & Tunai) dari Supabase ke browser
+ */
+export async function sinkronkanPembayaranDariSupabase(): Promise<void> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
+  try {
+    const supabase = await getSupabase();
+    const { data, error } = await supabase
+      .from('pengaturan_toko')
+      .select('kunci, nilai')
+      .in('kunci', [KUNCI_STORAGE_QRIS, KUNCI_STORAGE_TUNAI]);
+
+    if (!error && data && data.length > 0) {
+      for (const item of data) {
+        if (item.kunci === KUNCI_STORAGE_QRIS && item.nilai) {
+          localStorage.setItem(KUNCI_STORAGE_QRIS, JSON.stringify(item.nilai));
+          daftarQrisOutletSignal.value = { ...item.nilai };
+        } else if (item.kunci === KUNCI_STORAGE_TUNAI && item.nilai) {
+          localStorage.setItem(KUNCI_STORAGE_TUNAI, JSON.stringify(item.nilai));
+          konfigurasiTunaiSignal.value = { ...item.nilai };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Gagal sinkron pembayaran dari Supabase:', err);
+  }
+}
 
 /**
  * Urutan tombol nominal tunai di kasir: semua pecahan yang disimpan (selain yang sama dengan total),

@@ -7,6 +7,7 @@ import {
   muatSemuaQrisOutlet,
   simpanQrisOutlet,
   hapusQrisOutlet,
+  sinkronkanPembayaranDariSupabase,
   urutkanPecahanKasir,
   type KonfigurasiTunai,
   type KonfigurasiQrisOutlet,
@@ -60,14 +61,52 @@ export function LayarPengaturanPembayaran() {
   const [simulasiQrUrl, setSimulasiQrUrl] = useState<string>('');
 
   useEffect(() => {
+    // Sinkronkan data pembayaran dari Supabase jika online
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      sinkronkanPembayaranDariSupabase()
+        .then(() => {
+          setPetaQrisOutlet(muatSemuaQrisOutlet());
+          setPecahanList([...konfigurasiTunaiSignal.value.pecahanCepat]);
+          setTampilkanUangPas(konfigurasiTunaiSignal.value.tampilkanUangPas);
+        })
+        .catch(() => {});
+    }
+
     muatSemuaOutlet()
       .then((outlets) => {
-        setDaftarOutlet(outlets);
-        if (outlets.length > 0 && !outletTerpilihId) {
-          setOutletTerpilihId(outlets[0].id);
+        if (outlets && outlets.length > 0) {
+          setDaftarOutlet(outlets);
+          setOutletTerpilihId((prev) => prev || outlets[0].id);
+        } else {
+          // Jika belum ada cabang terdaftar, gunakan fallback Outlet Utama
+          const outletDefault: OutletItem = {
+            id: 'utama',
+            kode: 'UTAMA',
+            nama: 'Outlet Utama / Toko Kasir',
+            alamat: '',
+            telepon: '',
+            catatan_struk: 'Terima kasih atas kunjungan Anda!',
+            aktif: true,
+            diubah_pada: new Date().toISOString(),
+          };
+          setDaftarOutlet([outletDefault]);
+          setOutletTerpilihId('utama');
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        const outletDefault: OutletItem = {
+          id: 'utama',
+          kode: 'UTAMA',
+          nama: 'Outlet Utama / Toko Kasir',
+          alamat: '',
+          telepon: '',
+          catatan_struk: 'Terima kasih atas kunjungan Anda!',
+          aktif: true,
+          diubah_pada: new Date().toISOString(),
+        };
+        setDaftarOutlet([outletDefault]);
+        setOutletTerpilihId('utama');
+      });
     setPetaQrisOutlet(muatSemuaQrisOutlet());
   }, []);
 
@@ -100,21 +139,21 @@ export function LayarPengaturanPembayaran() {
     setInputPecahanBaru('');
   };
 
-  const handleSimpanTunai = () => {
+  const handleSimpanTunai = async () => {
     if (pecahanList.length === 0) {
       notif('Minimal harus ada 1 pecahan tunai', true);
       return;
     }
-    simpanKonfigurasiTunai({
+    await simpanKonfigurasiTunai({
       pecahanCepat: pecahanList,
       tampilkanUangPas,
     });
-    notif('Pengaturan pecahan tunai berhasil disimpan');
+    notif('Pengaturan pecahan tunai berhasil disimpan & disinkronkan ke cloud');
   };
 
   // ── Handler Tab QRIS ──
   const qrisOutletAktif = outletTerpilihId ? petaQrisOutlet[outletTerpilihId] || null : null;
-  const outletTerpilih = daftarOutlet.find((o) => o.id === outletTerpilihId) || null;
+  const outletTerpilih = daftarOutlet.find((o) => o.id === outletTerpilihId) || daftarOutlet[0] || null;
 
   // Generate simulator jika ada QRIS aktif
   useEffect(() => {
@@ -170,12 +209,17 @@ export function LayarPengaturanPembayaran() {
     setManualPayloadQris('');
   };
 
-  const handleKonfirmasiSimpanQris = () => {
-    if (!outletTerpilihId || !previewQrTerbaca) return;
+  const handleKonfirmasiSimpanQris = async () => {
+    if (!previewQrTerbaca) {
+      notif('Data QRIS belum siap untuk disimpan', true);
+      return;
+    }
 
-    const outletNama = outletTerpilih?.nama || 'Toko Mitarasa';
-    simpanQrisOutlet({
-      outletId: outletTerpilihId,
+    const idTerpilih = outletTerpilihId || outletTerpilih?.id || 'utama';
+    const outletNama = outletTerpilih?.nama || 'Outlet Utama / Toko Kasir';
+
+    await simpanQrisOutlet({
+      outletId: idTerpilih,
       outletNama,
       qrisPayload: previewQrTerbaca.payload,
       merchantName: previewQrTerbaca.merchantName || outletNama,
@@ -186,12 +230,12 @@ export function LayarPengaturanPembayaran() {
 
     setPetaQrisOutlet(muatSemuaQrisOutlet());
     setPreviewQrTerbaca(null);
-    notif(`QRIS untuk cabang "${outletNama}" berhasil disimpan!`);
+    notif(`QRIS untuk cabang "${outletNama}" berhasil disimpan & disinkronkan ke cloud!`);
   };
 
-  const handleHapusQris = (outletId: string) => {
+  const handleHapusQris = async (outletId: string) => {
     if (confirm('Hapus QRIS untuk cabang ini? Transaksi QRIS kasir akan kembali ke mode manual.')) {
-      hapusQrisOutlet(outletId);
+      await hapusQrisOutlet(outletId);
       setPetaQrisOutlet(muatSemuaQrisOutlet());
       notif('QRIS cabang berhasil dihapus');
     }
@@ -402,14 +446,18 @@ export function LayarPengaturanPembayaran() {
                   onChange={(e) => setOutletTerpilihId((e.target as HTMLSelectElement).value)}
                   class="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-hidden focus:border-slate-900 focus:ring-1 focus:ring-slate-900 cursor-pointer"
                 >
-                  {daftarOutlet.map((o) => {
-                    const adaQris = !!petaQrisOutlet[o.id];
-                    return (
-                      <option key={o.id} value={o.id}>
-                        {o.nama} {adaQris ? '(QRIS Aktif)' : '(Belum ada QRIS)'}
-                      </option>
-                    );
-                  })}
+                  {daftarOutlet.length === 0 ? (
+                    <option value="utama">Outlet Utama / Toko Kasir</option>
+                  ) : (
+                    daftarOutlet.map((o) => {
+                      const adaQris = !!petaQrisOutlet[o.id];
+                      return (
+                        <option key={o.id} value={o.id}>
+                          {o.nama} {adaQris ? '(QRIS Aktif)' : '(Belum ada QRIS)'}
+                        </option>
+                      );
+                    })
+                  )}
                 </select>
               </div>
             </div>

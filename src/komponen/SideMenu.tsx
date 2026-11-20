@@ -4,7 +4,7 @@ import { getProfilOutlet } from '../data/outlet.js';
 import {
   IconKasir,
   IconRiwayat,
-  IconShift,
+  IconUangAwal,
   IconLaporan,
   IconMenu,
   IconTambahan,
@@ -312,10 +312,10 @@ export function SideMenu({ isOpen, onClose, currentRoute }: SideMenuProps) {
               onClick={() => handlePindah('#/riwayat')}
             />
             <MenuRow
-              ikon={<IconShift size={18} />}
-              label="Shift Kasir"
-              aktif={baseRoute === '#/shift'}
-              onClick={() => handlePindah('#/shift')}
+              ikon={<IconUangAwal size={18} />}
+              label="Uang Awal Toko"
+              aktif={baseRoute === '#/uang-awal' || baseRoute === '#/shift'}
+              onClick={() => handlePindah('#/uang-awal')}
             />
             <MenuRow
               ikon={<IconLaporan size={18} />}

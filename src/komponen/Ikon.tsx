@@ -59,8 +59,8 @@ export function IconRiwayat({ size = 20, strokeWidth = 1.75, color = 'currentCol
   );
 }
 
-// 3. Shift Kasir / Jam Kerja
-export function IconShift({ size = 20, strokeWidth = 1.75, color = 'currentColor', ...props }: IconProps) {
+// 3. Uang Awal Toko / Modal Kasir (Banknote / Uang Kas)
+export function IconUangAwal({ size = 20, strokeWidth = 1.75, color = 'currentColor', ...props }: IconProps) {
   return (
     <svg
       width={size}
@@ -73,11 +73,15 @@ export function IconShift({ size = 20, strokeWidth = 1.75, color = 'currentColor
       strokeLinejoin="round"
       {...props}
     >
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M6 12h.01M18 12h.01" />
     </svg>
   );
 }
+
+// Alias kompatibilitas
+export const IconShift = IconUangAwal;
 
 // 4. Laporan Penjualan / Grafik Analitik
 export function IconLaporan({ size = 20, strokeWidth = 1.75, color = 'currentColor', ...props }: IconProps) {

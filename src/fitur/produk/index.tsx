@@ -6,8 +6,10 @@ import {
   simpanKategoriAdmin,
   hapusKategoriAdmin,
   hitungKeuntungan,
+  sinkronkanMenuDariSupabase,
 } from '../../data/menu.js';
 import { formatRupiah } from '../../util/rupiah.js';
+import { kompresGambar } from '../../util/gambar.js';
 import type { ProdukItem, KategoriItem } from '../../data/db.js';
 
 export function LayarKelolaProduk() {
@@ -35,12 +37,20 @@ export function LayarKelolaProduk() {
   const [formNamaKategori, setFormNamaKategori] = useState('');
   const [formUrutanKategori, setFormUrutanKategori] = useState<number | ''>(1);
 
+  const [memprosesGambar, setMemprosesGambar] = useState(false);
+
   useEffect(() => {
     muatData();
   }, []);
 
   const muatData = async () => {
     setLoading(true);
+    // Sinkronkan dulu dari Supabase jika perangkat sedang online
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      try {
+        await sinkronkanMenuDariSupabase();
+      } catch {}
+    }
     const { produk, kategori } = await muatSemuaMenuAdmin();
     setDaftarProduk(produk);
     setDaftarKategori(kategori);
@@ -55,44 +65,22 @@ export function LayarKelolaProduk() {
     setTimeout(() => setPesanSukses(''), 3000);
   };
 
-  // Helper kompres foto ke base64 (Max 400x400)
-  const handleUploadGambar = (e: Event) => {
+  // Kompresi otomatis gambar menu: max 280px WebP/JPEG ringan (~8-20 KB)
+  const handleUploadGambar = async (e: Event) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_SIZE = 400;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_SIZE) {
-            height = Math.round((height * MAX_SIZE) / width);
-            width = MAX_SIZE;
-          }
-        } else {
-          if (height > MAX_SIZE) {
-            width = Math.round((width * MAX_SIZE) / height);
-            height = MAX_SIZE;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-          setFormGambar(dataUrl);
-        }
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    setMemprosesGambar(true);
+    try {
+      const dataUrl = await kompresGambar(file, { maxDimensi: 280, kualitas: 0.65 });
+      setFormGambar(dataUrl);
+      notifikasi('Foto menu berhasil dikompresi & disiapkan');
+    } catch {
+      notifikasi('Gagal memproses gambar foto menu');
+    } finally {
+      setMemprosesGambar(false);
+      (e.target as HTMLInputElement).value = '';
+    }
   };
 
   // Buka Form Tambah Menu

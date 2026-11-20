@@ -1,6 +1,7 @@
 import { getLocalDB } from './db.js';
 import { getSupabase } from './supabase.js';
 import { sinkronkanMenuDariSupabase } from './menu.js';
+import { sinkronkanPembayaranDariSupabase } from './pembayaran.js';
 import { statusSinkronSignal, pendingOutboxCountSignal } from '../state/sinkron.js';
 
 let isSyncing = false;
@@ -79,8 +80,9 @@ export async function prosesOutbox(): Promise<void> {
     pendingOutboxCountSignal.value = sisa;
     statusSinkronSignal.value = sisa > 0 ? 'menunggu' : 'tersinkron';
 
-    // Tarik katalog menu terbaru jika ada pembaruan dari owner
+    // Tarik katalog menu & pengaturan pembayaran terbaru dari cloud Supabase
     await sinkronkanMenuDariSupabase();
+    await sinkronkanPembayaranDariSupabase();
   } catch (err) {
     console.warn('Gagal memproses outbox:', err);
   } finally {
@@ -92,6 +94,8 @@ export async function prosesOutbox(): Promise<void> {
 export function inisialisasiSinkronisasiOtomatis(): () => void {
   const handleOnline = () => {
     prosesOutbox();
+    sinkronkanMenuDariSupabase();
+    sinkronkanPembayaranDariSupabase();
   };
 
   if (typeof window !== 'undefined') {

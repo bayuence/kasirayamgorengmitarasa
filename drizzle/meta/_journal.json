@@ -15,6 +15,13 @@
       "when": 1794129886610,
       "tag": "0001_rls_and_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795158392221,
+      "tag": "0002_big_eternals",
+      "breakpoints": true
     }
   ]
 }

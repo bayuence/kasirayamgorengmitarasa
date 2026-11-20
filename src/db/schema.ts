@@ -32,6 +32,46 @@ export const profil = pgTable(
   ],
 );
 
+// Kategori menu
+export const kategori = pgTable('kategori', {
+  id: text('id').primaryKey(),
+  nama: text('nama').notNull(),
+  urutan: integer('urutan').notNull().default(0),
+  aktif: boolean('aktif').notNull().default(true),
+  diubahPada: timestamp('diubah_pada', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// Outlet / Cabang
+export const outlet = pgTable('outlet', {
+  id: text('id').primaryKey(),
+  kode: text('kode').default(''),
+  nama: text('nama').notNull(),
+  alamat: text('alamat').default(''),
+  telepon: text('telepon').default(''),
+  catatanStruk: text('catatan_struk').default('Terima kasih atas kunjungan Anda!'),
+  aktif: boolean('aktif').notNull().default(true),
+  sumber: text('sumber').default('manual'),
+  presensiLocationId: text('presensi_location_id'),
+  qrisPayload: text('qris_payload'),
+  qrisMerchantName: text('qris_merchant_name'),
+  qrisMerchantCity: text('qris_merchant_city'),
+  qrisImage: text('qris_image'),
+  diubahPada: timestamp('diubah_pada', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// Pengaturan Toko & Pembayaran Global
+export const pengaturanToko = pgTable('pengaturan_toko', {
+  kunci: text('kunci').primaryKey(),
+  nilai: jsonb('nilai').notNull(),
+  diubahPada: timestamp('diubah_pada', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // Katalog produk
 export const produk = pgTable(
   'produk',
@@ -40,6 +80,10 @@ export const produk = pgTable(
     varian: text('varian').notNull(),
     paket: text('paket').notNull(),
     isi: text('isi').notNull().default(''),
+    gambar: text('gambar').default(''),
+    kategori: text('kategori').default('Paket Ayam'),
+    kategoriId: text('kategori_id'),
+    hpp: integer('hpp').default(0),
     harga: integer('harga').notNull(),
     urutan: integer('urutan').notNull().default(0),
     aktif: boolean('aktif').notNull().default(true),

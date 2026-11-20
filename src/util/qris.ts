@@ -154,11 +154,38 @@ export async function decodeQrisFromImage(
 
         if (code && code.data) {
           const parsed = parseQrisPayload(code.data);
+          // Buat thumbnail mini yang sangat ringan untuk preview (~5-10 KB)
+          let previewThumbnail = '';
+          try {
+            const thumbCanvas = document.createElement('canvas');
+            const thumbDim = 200;
+            let tw = width;
+            let th = height;
+            if (tw > thumbDim || th > thumbDim) {
+              if (tw > th) {
+                th = Math.round((th * thumbDim) / tw);
+                tw = thumbDim;
+              } else {
+                tw = Math.round((tw * thumbDim) / th);
+                th = thumbDim;
+              }
+            }
+            thumbCanvas.width = tw;
+            thumbCanvas.height = th;
+            const tctx = thumbCanvas.getContext('2d');
+            if (tctx) {
+              tctx.drawImage(img, 0, 0, tw, th);
+              previewThumbnail = thumbCanvas.toDataURL('image/jpeg', 0.5);
+            }
+          } catch {
+            previewThumbnail = '';
+          }
+
           resolve({
             payload: code.data,
             merchantName: parsed.merchantName,
             merchantCity: parsed.merchantCity,
-            previewUrl: e.target?.result as string,
+            previewUrl: previewThumbnail,
           });
         } else {
           reject(

@@ -16,17 +16,58 @@ CREATE TABLE IF NOT EXISTS "profil" (
   CONSTRAINT "profil_peran_check" CHECK ("peran" in ('owner', 'kasir'))
 );
 
+CREATE TABLE IF NOT EXISTS "kategori" (
+  "id" text PRIMARY KEY NOT NULL,
+  "nama" text NOT NULL,
+  "urutan" integer DEFAULT 0 NOT NULL,
+  "aktif" boolean DEFAULT true NOT NULL,
+  "diubah_pada" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "outlet" (
+  "id" text PRIMARY KEY NOT NULL,
+  "kode" text DEFAULT '',
+  "nama" text NOT NULL,
+  "alamat" text DEFAULT '',
+  "telepon" text DEFAULT '',
+  "catatan_struk" text DEFAULT 'Terima kasih atas kunjungan Anda!',
+  "aktif" boolean DEFAULT true NOT NULL,
+  "sumber" text DEFAULT 'manual',
+  "presensi_location_id" text,
+  "qris_payload" text,
+  "qris_merchant_name" text,
+  "qris_merchant_city" text,
+  "qris_image" text,
+  "diubah_pada" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "pengaturan_toko" (
+  "kunci" text PRIMARY KEY NOT NULL,
+  "nilai" jsonb NOT NULL,
+  "diubah_pada" timestamp with time zone DEFAULT now() NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS "produk" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "varian" text NOT NULL,
   "paket" text NOT NULL,
   "isi" text DEFAULT '' NOT NULL,
+  "gambar" text DEFAULT '',
+  "kategori" text DEFAULT 'Paket Ayam',
+  "kategori_id" text,
+  "hpp" integer DEFAULT 0,
   "harga" integer NOT NULL,
   "urutan" integer DEFAULT 0 NOT NULL,
   "aktif" boolean DEFAULT true NOT NULL,
   "diubah_pada" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "produk_harga_check" CHECK ("harga" >= 0)
 );
+
+-- Migrasi kolom jika tabel produk sudah dibuat sebelumnya
+ALTER TABLE "produk" ADD COLUMN IF NOT EXISTS "gambar" text;
+ALTER TABLE "produk" ADD COLUMN IF NOT EXISTS "kategori" text DEFAULT 'Paket Ayam';
+ALTER TABLE "produk" ADD COLUMN IF NOT EXISTS "kategori_id" text;
+ALTER TABLE "produk" ADD COLUMN IF NOT EXISTS "hpp" integer DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS "tambahan" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -45,8 +86,25 @@ CREATE TABLE IF NOT EXISTS "shift" (
   "tutup_pada" timestamp with time zone,
   "kas_awal" integer DEFAULT 0 NOT NULL,
   "kas_akhir" integer,
-  "selisih" integer
+  "selisih" integer,
+  "tanggal" date DEFAULT CURRENT_DATE,
+  "kasir_nama" text,
+  "total_tunai" integer DEFAULT 0,
+  "total_qris" integer DEFAULT 0,
+  "jumlah_pesanan" integer DEFAULT 0,
+  "catatan" text,
+  "sumber_dana" text DEFAULT 'Tim Keuangan',
+  "rincian_pecahan" jsonb
 );
+
+ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS "tanggal" date DEFAULT CURRENT_DATE;
+ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS "kasir_nama" text;
+ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS "total_tunai" integer DEFAULT 0;
+ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS "total_qris" integer DEFAULT 0;
+ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS "jumlah_pesanan" integer DEFAULT 0;
+ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS "catatan" text;
+ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS "sumber_dana" text DEFAULT 'Tim Keuangan';
+ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS "rincian_pecahan" jsonb;
 
 CREATE TABLE IF NOT EXISTS "pesanan" (
   "id" uuid PRIMARY KEY NOT NULL,
@@ -142,25 +200,37 @@ $$;
 ALTER TABLE public.profil ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.produk ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tambahan ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.kategori ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.outlet ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pengaturan_toko ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shift ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pesanan ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.item_pesanan ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.log_audit ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "kategori: semua boleh baca" ON public.kategori FOR SELECT USING (true);
+CREATE POLICY "kategori: kelola" ON public.kategori FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "outlet: semua boleh baca" ON public.outlet FOR SELECT USING (true);
+CREATE POLICY "outlet: kelola" ON public.outlet FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "pengaturan: semua boleh baca" ON public.pengaturan_toko FOR SELECT USING (true);
+CREATE POLICY "pengaturan: kelola" ON public.pengaturan_toko FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "profil: baca sendiri atau owner" ON public.profil
   FOR SELECT USING (id = auth.uid() OR public.adalah_owner());
 CREATE POLICY "profil: owner kelola" ON public.profil
   FOR ALL USING (public.adalah_owner()) WITH CHECK (public.adalah_owner());
 
-CREATE POLICY "produk: semua login boleh baca" ON public.produk
-  FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "produk: owner kelola" ON public.produk
-  FOR ALL USING (public.adalah_owner()) WITH CHECK (public.adalah_owner());
+CREATE POLICY "produk: semua boleh baca" ON public.produk
+  FOR SELECT USING (true);
+CREATE POLICY "produk: kelola" ON public.produk
+  FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "tambahan: semua login boleh baca" ON public.tambahan
-  FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "tambahan: owner kelola" ON public.tambahan
-  FOR ALL USING (public.adalah_owner()) WITH CHECK (public.adalah_owner());
+CREATE POLICY "tambahan: semua boleh baca" ON public.tambahan
+  FOR SELECT USING (true);
+CREATE POLICY "tambahan: kelola" ON public.tambahan
+  FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "shift: kasir kelola miliknya" ON public.shift
   FOR ALL USING (kasir_id = auth.uid() OR public.adalah_owner())
