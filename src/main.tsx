@@ -4,7 +4,7 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/komponen.css';
 
-// PWA Service Worker Registration dengan Auto-Update Instan
+// PWA Service Worker Registration dengan Auto-Update Instan (v2.0.1 - encedevsaja)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   import('virtual:pwa-register').then(({ registerSW }) => {
     const updateSW = registerSW({
