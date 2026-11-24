@@ -7,7 +7,7 @@ import {
   type ProdukItem,
   type OutboxItem,
 } from '../../data/db.js';
-import { getTanggalLokal, formatNomorAntrean, batalkanPesananLokal } from '../../data/outbox.js';
+import { getTanggalLokal, formatNomorAntrean, batalkanPesananLokal, hapusPesananPermanen } from '../../data/outbox.js';
 import { formatRupiah } from '../../util/rupiah.js';
 import { formatTeksStruk, bagikanStruk } from '../../util/struk.js';
 import { sessionSignal } from '../../state/sesi.js';
@@ -65,6 +65,10 @@ export function LayarRiwayatAdmin() {
   const [modalBatal, setModalBatal] = useState(false);
   const [alasanBatalCepat, setAlasanBatalCepat] = useState('');
   const [errorBatal, setErrorBatal] = useState('');
+
+  // Modal Hapus Permanen
+  const [modalHapus, setModalHapus] = useState(false);
+  const [konfirmasiHapusTeks, setKonfirmasiHapusTeks] = useState('');
 
   const notifikasi = (teks: string) => {
     setPesanNotif(teks);
@@ -253,6 +257,20 @@ export function LayarRiwayatAdmin() {
     setModeEdit(false);
     setPesananDipilih(null);
     await muatDataPesanan();
+  };
+
+  // Hapus Permanen Transaksi oleh Admin
+  const handleHapusPermanen = async () => {
+    if (!pesananDipilih) return;
+    try {
+      await hapusPesananPermanen(pesananDipilih.pesanan.id);
+      notifikasi(`Transaksi ${pesananDipilih.nomorAntrean} telah dihapus permanen dari sistem.`);
+      setModalHapus(false);
+      setPesananDipilih(null);
+      await muatDataPesanan();
+    } catch (err: any) {
+      alert('Gagal menghapus transaksi: ' + (err.message || 'Error tidak diketahui'));
+    }
   };
 
   // Batalkan Cepat dari Detail
@@ -743,15 +761,29 @@ export function LayarRiwayatAdmin() {
                   </button>
                 </div>
 
-                {pesananDipilih.pesanan.status === 'selesai' && (
+                {/* Tombol Batalkan / Hapus untuk Admin */}
+                <div class="space-y-2 pt-1 border-t border-slate-100">
+                  {pesananDipilih.pesanan.status === 'selesai' && (
+                    <button
+                      type="button"
+                      onClick={() => setModalBatal(true)}
+                      class="w-full py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-amber-200"
+                    >
+                      Batalkan Transaksi Ini (Tandai Status Batal)
+                    </button>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => setModalBatal(true)}
-                    class="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-rose-200"
+                    onClick={() => {
+                      setKonfirmasiHapusTeks('');
+                      setModalHapus(true);
+                    }}
+                    class="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-rose-200 flex items-center justify-center gap-1.5"
                   >
-                    Batalkan Transaksi Ini
+                    <span>🗑️ Hapus Transaksi Ini Secara Permanen</span>
                   </button>
-                )}
+                </div>
               </div>
             ) : (
               /* ── FORM EDIT TRANSAKSI OLEH ADMIN ── */
@@ -979,6 +1011,46 @@ export function LayarRiwayatAdmin() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ── MODAL KONFIRMASI HAPUS PERMANEN OLEH ADMIN ── */}
+      {modalHapus && pesananDipilih && (
+        <div class="fixed inset-0 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center z-70 p-4">
+          <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-3.5 border border-rose-100 animate-in fade-in zoom-in-95">
+            <div class="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mx-auto text-lg">
+              ⚠️
+            </div>
+
+            <div class="text-center">
+              <h3 class="text-sm font-black text-slate-900">
+                Hapus Transaksi Permanen?
+              </h3>
+              <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                Anda akan menghapus nota <strong>{pesananDipilih.nomorAntrean}</strong> ({pesananDipilih.pesanan.kode_transaksi || pesananDipilih.pesanan.id.slice(0, 8)}) senilai <strong>{formatRupiah(pesananDipilih.pesanan.total)}</strong>. Data ini akan dihapus dari riwayat toko dan cloud Supabase.
+              </p>
+            </div>
+
+            <div class="bg-rose-50 border border-rose-200/80 rounded-xl p-2.5 text-[11px] text-rose-900">
+              *Tindakan ini tidak dapat dibatalkan. Gunakan jika transaksi salah input fatal, double nota, atau data uji coba.
+            </div>
+
+            <div class="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setModalHapus(false)}
+                class="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleHapusPermanen}
+                class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black tracking-wide shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>Ya, Hapus Permanen</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -60,6 +60,11 @@ export async function prosesOutbox(): Promise<void> {
           });
           if (!error) sukses = true;
           else console.warn('Gagal eksekusi batalkan_pesanan via RPC:', error);
+        } else if ((item.tabel as any) === 'hapus_pesanan') {
+          await supabase.from('item_pesanan').delete().eq('pesanan_id', item.data.id);
+          const { error } = await supabase.from('pesanan').delete().eq('id', item.data.id);
+          if (!error) sukses = true;
+          else console.warn('Gagal hapus pesanan dari cloud:', error);
         }
 
         if (sukses) {

@@ -3,6 +3,7 @@ import { sessionSignal } from '../state/sesi.js';
 import { pendingOutboxCountSignal } from '../state/sinkron.js';
 import { outletAktifSignal } from './outlet.js';
 import { prosesOutbox } from './sync.js';
+import { getSupabase } from './supabase.js';
 
 // Ambil kode perangkat dari localStorage atau default 'A'
 export function getKodePerangkat(): string {
@@ -238,4 +239,49 @@ export async function batalkanPesananLokal(
     prosesOutbox().catch(() => {});
   }
 }
+
+// Hapus pesanan secara permanen oleh Admin (misal karena salah input fatal / uji coba)
+export async function hapusPesananPermanen(pesananId: string): Promise<void> {
+  const db = await getLocalDB();
+  const waktuISO = new Date().toISOString();
+
+  // 1. Ambil item-item pesanan untuk dihapus
+  const items = await db.getAllFromIndex('item_pesanan', 'by-pesanan', pesananId);
+
+  // 2. Transaksi penghapusan lokal dari IndexedDB
+  const tx = db.transaction(['pesanan', 'item_pesanan', 'outbox'], 'readwrite');
+  await tx.objectStore('pesanan').delete(pesananId);
+  for (const it of items) {
+    await tx.objectStore('item_pesanan').delete(it.id);
+  }
+
+  // 3. Masukkan perintah hapus ke outbox
+  const outboxHapus: OutboxItem = {
+    id: crypto.randomUUID(),
+    tabel: 'hapus_pesanan' as any,
+    data: {
+      id: pesananId,
+      pengguna_id: sessionSignal.value?.id || null,
+      waktu: waktuISO,
+    },
+    waktu: waktuISO,
+    status: 'pending',
+    percobaan: 0,
+  };
+  await tx.objectStore('outbox').put(outboxHapus);
+  await tx.done;
+
+  pendingOutboxCountSignal.value = await db.count('outbox');
+
+  // 4. Jika sedang online, langsung hapus dari Supabase
+  if (typeof navigator !== 'undefined' && navigator.onLine) {
+    try {
+      const supabase = await getSupabase();
+      await supabase.from('item_pesanan').delete().eq('pesanan_id', pesananId);
+      await supabase.from('pesanan').delete().eq('id', pesananId);
+    } catch {}
+    prosesOutbox().catch(() => {});
+  }
+}
+
 
