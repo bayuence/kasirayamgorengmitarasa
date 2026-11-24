@@ -2,6 +2,7 @@ import { getLocalDB } from './db.js';
 import { getSupabase } from './supabase.js';
 import { sinkronkanMenuDariSupabase } from './menu.js';
 import { sinkronkanPembayaranDariSupabase } from './pembayaran.js';
+import { muatSemuaOutlet } from './outlet.js';
 import { statusSinkronSignal, pendingOutboxCountSignal } from '../state/sinkron.js';
 
 let isSyncing = false;
@@ -105,10 +106,19 @@ export async function prosesOutbox(): Promise<void> {
 
 // Inisialisasi pendengar event online dan timer interval 30 detik
 export function inisialisasiSinkronisasiOtomatis(): () => void {
+  const jalankanSinkronisasiPenuh = async () => {
+    try {
+      await muatSemuaOutlet();
+      await sinkronkanMenuDariSupabase();
+      await sinkronkanPembayaranDariSupabase();
+      await prosesOutbox();
+    } catch (e) {
+      console.warn('Gagal sinkronisasi data cloud:', e);
+    }
+  };
+
   const handleOnline = () => {
-    prosesOutbox();
-    sinkronkanMenuDariSupabase();
-    sinkronkanPembayaranDariSupabase();
+    jalankanSinkronisasiPenuh();
   };
 
   if (typeof window !== 'undefined') {
@@ -119,9 +129,9 @@ export function inisialisasiSinkronisasiOtomatis(): () => void {
       }
     }, 30 * 1000);
 
-    // Jalankan segera saat aplikasi dimuat
+    // Jalankan segera saat aplikasi dimuat agar data produk, QRIS, & outlet terhidrasi instan
     if (navigator.onLine) {
-      prosesOutbox();
+      jalankanSinkronisasiPenuh();
     }
 
     return () => {

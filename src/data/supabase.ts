@@ -8,12 +8,12 @@ let supabasePresensiInstance: SupabaseClient | null = null;
  */
 export async function getSupabase(): Promise<SupabaseClient> {
   if (!supabaseInstance) {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.warn('VITE_SUPABASE_URL atau VITE_SUPABASE_ANON_KEY belum disetel.');
-    }
+    const supabaseUrl =
+      import.meta.env.VITE_SUPABASE_URL ||
+      'https://dkkgncgioenbrkzqqekn.supabase.co';
+    const supabaseAnonKey =
+      import.meta.env.VITE_SUPABASE_ANON_KEY ||
+      'sb_publishable_dBGwaMxyCffekjt6YDVJww_pQApMkMK';
 
     const { createClient } = await import('@supabase/supabase-js');
     supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
