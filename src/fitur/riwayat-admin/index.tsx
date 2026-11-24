@@ -391,9 +391,14 @@ export function LayarRiwayatAdmin() {
           {/* ── BARIS FILTER: TANGGAL + OUTLET ── */}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
             <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                Tanggal Transaksi:
-              </label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-[10px] font-bold text-slate-500 uppercase">
+                  Tanggal Transaksi:
+                </label>
+                <span class="text-[10px] font-bold text-slate-700">
+                  {formatTanggalPanjang(tanggalPilih)}
+                </span>
+              </div>
               <input
                 type="date"
                 value={tanggalPilih}
@@ -471,41 +476,86 @@ export function LayarRiwayatAdmin() {
 
       {/* ── KONTEN UTAMA ── */}
       <div class="max-w-4xl mx-auto px-4 py-4 space-y-3.5">
-        {/* Ringkasan Finansial & Keuntungan Bersih (Khas Admin) */}
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-2xs">
-            <span class="text-[10px] font-bold uppercase text-slate-400 block">Total Omzet Penjualan</span>
-            <span class="text-sm font-black text-slate-900 tabular-nums">
-              {formatRupiah(totalOmzetLunas)}
+        {/* Ringkasan Finansial: Pemisahan Jelas Omzet, Modal HPP, Laba Kotor, dan Estimasi Laba Bersih */}
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <span class="text-xs font-black uppercase tracking-wider text-slate-800">
+              📊 Laporan Rekap Keuangan & Margin Toko
             </span>
-            <span class="text-[9px] text-slate-400 block mt-0.5">{totalLunas} nota lunas</span>
-          </div>
-
-          <div class="bg-emerald-50/70 rounded-2xl border border-emerald-200/80 p-3 shadow-2xs">
-            <span class="text-[10px] font-bold uppercase text-emerald-800 block">Estimasi Laba Kotor</span>
-            <span class="text-sm font-black text-emerald-900 tabular-nums">
-              +{formatRupiah(totalLabaKotor)}
-            </span>
-            <span class="text-[9px] text-emerald-700 font-bold block mt-0.5">
-              Margin {totalOmzetLunas > 0 ? Math.round((totalLabaKotor / totalOmzetLunas) * 100) : 0}%
+            <span class="text-[11px] font-bold text-slate-500 font-mono">
+              {totalLunas} Transaksi Lunas {totalBatal > 0 ? `· ${totalBatal} Dibatalkan` : ''}
             </span>
           </div>
 
-          <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-2xs">
-            <span class="text-[10px] font-bold uppercase text-slate-400 block">Rincian Pembayaran</span>
-            <div class="text-[11px] font-bold text-slate-700 mt-0.5">
-              <span>Tunai: {formatRupiah(totalTunai)}</span>
-              <span class="block text-indigo-700">QRIS: {formatRupiah(totalQris)}</span>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {/* 1. OMZET PENJUALAN */}
+            <div class="bg-slate-900 text-white rounded-xl p-3 shadow-xs">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">1. Total Omzet</span>
+                <span class="text-[9px] px-1.5 py-0.2 bg-slate-800 text-slate-300 rounded">Kotor</span>
+              </div>
+              <span class="text-base font-black tracking-tight block mt-1 tabular-nums">
+                {formatRupiah(totalOmzetLunas)}
+              </span>
+              <p class="text-[9px] text-slate-400 mt-0.5 leading-tight">
+                Semua uang masuk kotor dari pembeli (Tunai: {formatRupiah(totalTunai)} · QRIS: {formatRupiah(totalQris)})
+              </p>
+            </div>
+
+            {/* 2. MODAL / HPP BAHAN */}
+            <div class="bg-amber-50/80 border border-amber-200/90 rounded-xl p-3">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-800">2. Modal (HPP)</span>
+                <span class="text-[9px] px-1.5 py-0.2 bg-amber-100 text-amber-900 rounded font-bold">Bahan</span>
+              </div>
+              <span class="text-base font-black text-amber-950 block mt-1 tabular-nums">
+                -{formatRupiah(totalHppSemua)}
+              </span>
+              <p class="text-[9px] text-amber-700 mt-0.5 leading-tight">
+                Total modal pokok bahan baku/porsi menu terjual
+              </p>
+            </div>
+
+            {/* 3. LABA KOTOR */}
+            <div class="bg-blue-50/80 border border-blue-200/90 rounded-xl p-3">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-blue-800">3. Laba Kotor</span>
+                <span class="text-[9px] px-1.5 py-0.2 bg-blue-100 text-blue-900 rounded font-bold">
+                  {totalOmzetLunas > 0 ? Math.round((totalLabaKotor / totalOmzetLunas) * 100) : 0}%
+                </span>
+              </div>
+              <span class="text-base font-black text-blue-950 block mt-1 tabular-nums">
+                +{formatRupiah(totalLabaKotor)}
+              </span>
+              <p class="text-[9px] text-blue-700 mt-0.5 leading-tight">
+                Hasil murni (Omzet dikurangi Modal HPP bahan)
+              </p>
+            </div>
+
+            {/* 4. LABA BERSIH ESTIMASI */}
+            <div class="bg-emerald-50/90 border border-emerald-300 rounded-xl p-3 shadow-2xs">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800">4. Laba Bersih</span>
+                <span class="text-[9px] px-1.5 py-0.2 bg-emerald-200 text-emerald-900 rounded font-black">Netto</span>
+              </div>
+              <span class="text-base font-black text-emerald-950 block mt-1 tabular-nums">
+                +{formatRupiah(totalLabaKotor)}
+              </span>
+              <p class="text-[9px] text-emerald-800 mt-0.5 leading-tight">
+                Keuntungan bersih operasional menu toko
+              </p>
             </div>
           </div>
 
-          <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-2xs">
-            <span class="text-[10px] font-bold uppercase text-slate-400 block">Estimasi Modal / HPP</span>
-            <span class="text-sm font-black text-slate-700 tabular-nums">
-              {formatRupiah(totalHppSemua)}
-            </span>
-            <span class="text-[9px] text-rose-600 block mt-0.5">
-              {totalBatal > 0 ? `${totalBatal} transaksi dibatalkan` : 'Semua transaksi tercatat'}
+          {/* Keterangan Rumus Transparan untuk User/Owner */}
+          <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <strong class="text-slate-800 font-bold">Rumus Keuangan: </strong>
+              <span>Omzet ({formatRupiah(totalOmzetLunas)}) - Modal HPP ({formatRupiah(totalHppSemua)}) = </span>
+              <strong class="text-emerald-700 font-extrabold">Laba Bersih (+{formatRupiah(totalLabaKotor)})</strong>
+            </div>
+            <span class="text-[10px] text-slate-400 font-semibold">
+              *Jika harga produk per menu diisi HPP-nya di menu produk, margin akan 100% presisi akurat
             </span>
           </div>
         </div>
@@ -561,11 +611,11 @@ export function LayarRiwayatAdmin() {
                         {totalItem} item ({items.map((it) => `${it.qty}x ${it.nama_produk}`).join(', ')})
                       </p>
 
-                      <div class="flex items-center gap-2 text-[10px] text-slate-400 mt-1 flex-wrap">
+                      <div class="flex items-center gap-2 text-[10px] text-slate-500 mt-1 flex-wrap">
                         <span>{formatWaktu(pesanan.waktu)}</span>
                         {!isBatal && (
-                          <span class="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                            Laba: +{formatRupiah(totalLaba)} ({marginPersen}%)
+                          <span class="text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                            Laba Bersih: +{formatRupiah(totalLaba)} (Margin {marginPersen}%)
                           </span>
                         )}
                         {pesanan.catatan && <span>· "{pesanan.catatan}"</span>}
@@ -651,23 +701,35 @@ export function LayarRiwayatAdmin() {
               </div>
             </div>
 
-            {/* KARTU KEUNTUNGAN / LABA BERSIH TRANSAKSI INI */}
-            <div class="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between text-xs">
-              <div>
-                <span class="text-[10px] font-bold uppercase text-emerald-800 block">
-                  Analisis Keuntungan Transaksi
-                </span>
-                <span class="text-xs text-emerald-950">
-                  Estimasi HPP: {formatRupiah(pesananDipilih.totalHpp)}
-                </span>
-              </div>
-              <div class="text-right">
-                <span class="text-sm font-black text-emerald-900 block tabular-nums">
-                  +{formatRupiah(pesananDipilih.totalLaba)}
-                </span>
-                <span class="text-[10px] font-bold text-emerald-700">
-                  Margin: {pesananDipilih.marginPersen}%
-                </span>
+            {/* KARTU RINCIAN OMZET, MODAL HPP, DAN LABA BERSIH TRANSAKSI INI */}
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2 text-xs">
+              <span class="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                Rincian Margin & Laba Transaksi Ini:
+              </span>
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="p-2 bg-white rounded-xl border border-slate-200">
+                  <span class="text-[9px] font-bold text-slate-400 block uppercase">1. Omzet Nota</span>
+                  <strong class="text-xs font-black text-slate-900 block mt-0.5 tabular-nums">
+                    {formatRupiah(pesananDipilih.pesanan.total)}
+                  </strong>
+                </div>
+
+                <div class="p-2 bg-amber-50 rounded-xl border border-amber-200">
+                  <span class="text-[9px] font-bold text-amber-800 block uppercase">2. Modal (HPP)</span>
+                  <strong class="text-xs font-black text-amber-950 block mt-0.5 tabular-nums">
+                    -{formatRupiah(pesananDipilih.totalHpp)}
+                  </strong>
+                </div>
+
+                <div class="p-2 bg-emerald-100/70 rounded-xl border border-emerald-300">
+                  <span class="text-[9px] font-black text-emerald-800 block uppercase">3. Laba Bersih</span>
+                  <strong class="text-xs font-black text-emerald-950 block mt-0.5 tabular-nums">
+                    +{formatRupiah(pesananDipilih.totalLaba)}
+                  </strong>
+                  <span class="text-[9px] font-bold text-emerald-700 block">
+                    Margin {pesananDipilih.marginPersen}%
+                  </span>
+                </div>
               </div>
             </div>
 
