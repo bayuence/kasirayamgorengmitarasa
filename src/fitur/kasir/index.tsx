@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { muatMenuLokal } from '../../data/menu.js';
+import { muatMenuLokal, sinkronkanMenuDariSupabase } from '../../data/menu.js';
 import { muatSemuaOutlet, pilihOutletAktif, outletAktifSignal } from '../../data/outlet.js';
 import type { ProdukItem, TambahanItem, KategoriItem, OutletItem } from '../../data/db.js';
 import { formatRupiah } from '../../util/rupiah.js';
@@ -7,7 +7,6 @@ import {
   itemKeranjangSignal,
   totalHargaSignal,
   totalQtySignal,
-  jenisPesananSignal,
   catatanPesananSignal,
   hapusItem,
   itemTerakhirDihapusSignal,
@@ -60,12 +59,24 @@ export function LayarKasir({ bukaBayarAwal = false }: LayarKasirProps) {
 
   useEffect(() => {
     setLoading(true);
+    // Muat data lokal dulu agar instan
     muatMenuLokal(outletAktifSignal.value?.id).then(({ produk, tambahan, kategori }) => {
       setProdukList(produk);
       setTambahanList(tambahan);
       setKategoriList(kategori || []);
       setLoading(false);
     });
+
+    // Otomatis tarik menu terbaru dari cloud (Supabase) jika online
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      sinkronkanMenuDariSupabase().then(() => {
+        muatMenuLokal(outletAktifSignal.value?.id).then(({ produk, tambahan, kategori }) => {
+          setProdukList(produk);
+          setTambahanList(tambahan);
+          setKategoriList(kategori || []);
+        });
+      }).catch(() => {});
+    }
   }, [outletAktifSignal.value?.id]);
 
   // Timer otomatis membersihkan notifikasi undo setelah 5 detik

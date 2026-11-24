@@ -114,8 +114,8 @@ export const tambahan = pgTable(
   ],
 );
 
-// Shift kasir
-export const shift = pgTable('shift', {
+// Uang awal kasir / modal toko
+export const uangAwal = pgTable('uang_awal', {
   id: uuid('id').primaryKey(),
   kasirId: uuid('kasir_id')
     .notNull()
@@ -126,6 +126,9 @@ export const shift = pgTable('shift', {
   kasAkhir: integer('kas_akhir'),
   selisih: integer('selisih'),
 });
+
+// Alias backward compatibility
+export const shift = uangAwal;
 
 // Pesanan / transaksi
 export const pesanan = pgTable(
@@ -144,7 +147,7 @@ export const pesanan = pgTable(
     kembalian: integer('kembalian').notNull().default(0),
     catatan: text('catatan'),
     alasanBatal: text('alasan_batal'),
-    shiftId: uuid('shift_id').references(() => shift.id),
+    uangAwalId: uuid('uang_awal_id').references(() => uangAwal.id),
     kasirId: uuid('kasir_id')
       .notNull()
       .references(() => profil.id),

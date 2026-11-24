@@ -17,7 +17,7 @@ import {
   muatQrisOutlet,
   type KonfigurasiQrisOutlet,
 } from '../../data/pembayaran.js';
-import { outletAktifSignal } from '../../data/outlet.js';
+import { outletAktifSignal, getProfilOutlet } from '../../data/outlet.js';
 import { generateQrisDinamis, generateQrCodeDataUrl } from '../../util/qris.js';
 import {
   IconTutup,
@@ -178,143 +178,246 @@ export function ModalPembayaran({ isOpen, onClose }: ModalPembayaranProps) {
         {/* Handle Sheet Bar (Mobile) */}
         <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2.5 mb-1.5 sm:hidden shrink-0" />
 
-        {/* ── TAMPILAN 1: HASIL STRUK SUKSES ── */}
-        {hasilTransaksi ? (
-          <div class="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col justify-between no-scrollbar">
-            <div>
-              <div class="text-center py-2">
-                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <IconCheck size={24} color="#16a34a" />
+        {/* ── TAMPILAN 1: HASIL STRUK SUKSES RESTORAN MODERN ── */}
+        {hasilTransaksi ? (() => {
+          const profilStruk = getProfilOutlet();
+          const waktuFormatted = new Date(hasilTransaksi.pesanan.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+          const tanggalFormatted = new Date(hasilTransaksi.pesanan.waktu).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+          return (
+            <div class="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col justify-between no-scrollbar">
+              <div>
+                {/* Header Struk Modern */}
+                <div class="text-center py-1 mb-2">
+                  <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2 shadow-2xs">
+                    <IconCheck size={20} color="#16a34a" />
+                  </div>
+
+                  {profilStruk.tampilkanLogo && profilStruk.logoUrl && (
+                    <div class="w-16 h-16 mx-auto mb-1 flex items-center justify-center">
+                      <img
+                        src={profilStruk.logoUrl}
+                        alt="Logo Resto"
+                        class="max-w-full max-h-full object-contain filter contrast-125"
+                      />
+                    </div>
+                  )}
+
+                  <h2 class="text-sm font-black uppercase text-slate-900 tracking-tight leading-tight">
+                    {profilStruk.namaToko || 'Ayam Goreng Mitarasa'}
+                  </h2>
+                  {profilStruk.slogan && (
+                    <p class="text-[10px] text-slate-500 italic leading-tight">
+                      {profilStruk.slogan}
+                    </p>
+                  )}
+                  {profilStruk.alamat && (
+                    <p class="text-[10px] text-slate-400 leading-tight">
+                      {profilStruk.alamat}
+                    </p>
+                  )}
                 </div>
-                <h1 class="text-4xl font-black text-slate-900 tracking-tight leading-none my-1 tabular-nums">
-                  {hasilTransaksi.nomorAntreanFormatted}
-                </h1>
-                <p class="text-[11px] font-mono font-bold text-slate-700 bg-slate-100 inline-block px-2 py-0.5 rounded mb-1">
-                  ID: {hasilTransaksi.kodeTransaksi}
-                </p>
-                <p class="text-xs text-slate-500 font-medium">
-                  Nomor Antrean • {new Date(hasilTransaksi.pesanan.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                </p>
+
+                {/* Nomor Antrean Jumbo Khas Restoran Cepat Saji */}
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-center my-2.5 shadow-2xs">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Nomor Antrean
+                  </span>
+                  <h1 class="text-4xl font-black text-slate-900 tracking-tight leading-none my-1 tabular-nums">
+                    {hasilTransaksi.nomorAntreanFormatted}
+                  </h1>
+                  <div class="flex items-center justify-center gap-2 mt-1">
+                    <span class="text-[10px] font-mono font-bold text-slate-700 bg-white border border-slate-200 px-2.5 py-0.5 rounded-md">
+                      ID: {hasilTransaksi.kodeTransaksi}
+                    </span>
+                  </div>
+                  <p class="text-[10px] text-slate-400 font-medium mt-1">
+                    {tanggalFormatted} • {waktuFormatted} • Kasir: {sessionSignal.value?.nama || 'Kasir'}
+                  </p>
+                </div>
+
+                {notifSalin && (
+                  <div class="bg-slate-900 text-white text-xs px-3 py-1.5 rounded-xl text-center my-2 font-medium shadow-sm animate-in fade-in">
+                    {notifSalin}
+                  </div>
+                )}
+
+                {/* Rincian Transaksi Lengkap */}
+                <div class="bg-white border border-slate-200 rounded-2xl p-3.5 my-2.5 text-xs shadow-2xs space-y-2">
+                  <div class="space-y-2 pb-2.5 border-b border-dashed border-slate-200">
+                    {hasilTransaksi.itemPesanan.map((it) => {
+                      const totalTambahan = it.tambahan.reduce((sum, t) => sum + t.harga * t.qty, 0);
+                      const subtotal = (it.harga_satuan + totalTambahan) * it.qty;
+                      return (
+                        <div key={it.id} class="flex justify-between items-start gap-2">
+                          <div class="flex-1">
+                            <span class="font-bold text-slate-900 block leading-tight">
+                              {it.qty}x {it.nama_produk}
+                            </span>
+                            {it.tambahan.map((t) => (
+                              <span key={t.nama} class="block text-[10px] text-slate-500 pl-2 leading-tight">
+                                + {t.nama} ({formatRupiah(t.harga)})
+                              </span>
+                            ))}
+                          </div>
+                          <span class="font-bold text-slate-900 tabular-nums">
+                            {formatRupiah(subtotal)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div class="pt-1 space-y-1.5">
+                    <div class="flex justify-between text-slate-500">
+                      <span>Total Tagihan:</span>
+                      <strong class="font-black text-slate-900 text-sm tabular-nums">
+                        {formatRupiah(hasilTransaksi.pesanan.total)}
+                      </strong>
+                    </div>
+                    <div class="flex justify-between text-slate-500 text-[11px]">
+                      <span>Metode Pembayaran:</span>
+                      <span class="font-bold text-slate-800 uppercase bg-slate-100 px-1.5 py-0.5 rounded">
+                        {hasilTransaksi.pesanan.metode === 'qris' ? 'QRIS DINAMIS (LUNAS)' : 'TUNAI'}
+                      </span>
+                    </div>
+                    <div class="flex justify-between text-slate-500 text-[11px]">
+                      <span>Uang Diterima:</span>
+                      <span class="font-semibold text-slate-800 tabular-nums">
+                        {formatRupiah(hasilTransaksi.pesanan.bayar)}
+                      </span>
+                    </div>
+                    <div class="flex justify-between pt-1 border-t border-slate-100 font-bold text-emerald-700 text-xs">
+                      <span>Kembalian:</span>
+                      <span class="tabular-nums font-black text-sm">
+                        {formatRupiah(hasilTransaksi.pesanan.kembalian)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Pesan Footer / Catatan Struk */}
+                  {(profilStruk.pesanFooter || profilStruk.instagram || profilStruk.wifiInfo) && (
+                    <div class="pt-2 border-t border-dashed border-slate-200 text-center text-[10px] text-slate-500 space-y-0.5">
+                      {profilStruk.pesanFooter && <p class="font-medium text-slate-700">{profilStruk.pesanFooter}</p>}
+                      {profilStruk.instagram && <p>Instagram: {profilStruk.instagram}</p>}
+                      {profilStruk.wifiInfo && <p class="bg-slate-50 py-0.5 rounded">📶 {profilStruk.wifiInfo}</p>}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tombol Cetak & Bagikan */}
+                <div class="grid grid-cols-2 gap-2 my-2">
+                  <button
+                    type="button"
+                    onClick={handleCetak}
+                    class="py-2.5 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <IconPrinter size={15} color="#0f172a" />
+                    <span>Cetak ({profilStruk.ukuranKertas})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBagikan}
+                    class="py-2.5 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <IconShare size={15} color="#0f172a" />
+                    <span>Bagikan Struk</span>
+                  </button>
+                </div>
               </div>
 
-              {notifSalin && (
-                <div class="bg-slate-900 text-white text-xs px-3 py-1.5 rounded-lg text-center my-2 font-medium">
-                  {notifSalin}
-                </div>
-              )}
+              {/* Tombol Pesanan Baru */}
+              <div class="pt-2">
+                <button
+                  type="button"
+                  onClick={handlePesananBaru}
+                  class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-extrabold tracking-wide cursor-pointer transition-all shadow-md"
+                >
+                  Selesai / Pesanan Baru ›
+                </button>
+              </div>
 
-              {/* Rincian Transaksi Singkat */}
-              <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 my-3 text-xs">
-                <div class="space-y-1.5 pb-2.5 border-b border-slate-200">
+              {/* ════ TEMPLATE CETAK FISIK THERMAL RESMI (Window.Print) ════ */}
+              <div class={`struk-print-area ${profilStruk.ukuranKertas === '80mm' ? 'kertas-80mm' : 'kertas-58mm'}`} style={{ display: 'none' }}>
+                <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+                  {profilStruk.tampilkanLogo && profilStruk.logoUrl && (
+                    <img
+                      src={profilStruk.logoUrl}
+                      class="logo-struk"
+                      alt="Logo"
+                      style={{ maxWidth: '36mm', maxHeight: '25mm', margin: '0 auto 4px auto', display: 'block' }}
+                    />
+                  )}
+                  <strong style={{ fontSize: '13px', display: 'block', textTransform: 'uppercase' }}>
+                    {profilStruk.namaToko || 'AYAM GORENG MITARASA'}
+                  </strong>
+                  {profilStruk.slogan && <div style={{ fontSize: '10px' }}>{profilStruk.slogan}</div>}
+                  {profilStruk.alamat && <div style={{ fontSize: '9px', marginTop: '2px' }}>{profilStruk.alamat}</div>}
+                  {profilStruk.telepon && <div style={{ fontSize: '9px' }}>Telp: {profilStruk.telepon}</div>}
+                </div>
+
+                {profilStruk.tampilkanAntreanBesar && (
+                  <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '6px 0', margin: '6px 0', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px' }}>NOMOR ANTREAN</div>
+                    <div style={{ fontSize: '26px', fontWeight: 'bold' }}>
+                      {hasilTransaksi.nomorAntreanFormatted}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ fontSize: '10px', margin: '4px 0', lineHeight: 1.3 }}>
+                  <div>No. Nota : {hasilTransaksi.kodeTransaksi}</div>
+                  <div>Waktu    : {tanggalFormatted} {waktuFormatted}</div>
+                  <div>Kasir    : {sessionSignal.value?.nama || 'Kasir'}</div>
+                </div>
+
+                <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', margin: '4px 0' }}>
                   {hasilTransaksi.itemPesanan.map((it) => {
                     const totalTambahan = it.tambahan.reduce((sum, t) => sum + t.harga * t.qty, 0);
                     const subtotal = (it.harga_satuan + totalTambahan) * it.qty;
                     return (
-                      <div key={it.id} class="flex justify-between items-start gap-2">
-                        <div class="flex-1">
-                          <span class="font-bold text-slate-900">{it.qty}x {it.nama_produk}</span>
-                          {it.tambahan.map((t) => (
-                            <span key={t.nama} class="block text-[10px] text-slate-500">+ {t.nama}</span>
-                          ))}
-                        </div>
-                        <span class="font-semibold text-slate-900 tabular-nums">{formatRupiah(subtotal)}</span>
+                      <div key={it.id} style={{ marginBottom: '4px' }}>
+                        <div>{it.qty}x {it.nama_produk}</div>
+                        {it.tambahan.map((t) => (
+                          <div key={t.nama} style={{ paddingLeft: '8px', fontSize: '9px' }}>
+                            + {t.nama} ({formatRupiah(t.harga)})
+                          </div>
+                        ))}
+                        <div style={{ textAlign: 'right' }}>{formatRupiah(subtotal)}</div>
                       </div>
                     );
                   })}
                 </div>
 
-                <div class="pt-2 space-y-1">
-                  <div class="flex justify-between">
-                    <span class="text-slate-500">Total:</span>
-                    <strong class="font-bold text-slate-900 tabular-nums">{formatRupiah(hasilTransaksi.pesanan.total)}</strong>
+                <div style={{ margin: '4px 0', fontSize: '11px', lineHeight: 1.35 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <strong>TOTAL:</strong>
+                    <strong>{formatRupiah(hasilTransaksi.pesanan.total)}</strong>
                   </div>
-                  <div class="flex justify-between">
-                    <span class="text-slate-500">Metode:</span>
-                    <span class="font-semibold text-slate-800 uppercase">{hasilTransaksi.pesanan.metode}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                    <span>Metode:</span>
+                    <span style={{ textTransform: 'uppercase' }}>{hasilTransaksi.pesanan.metode}</span>
                   </div>
-                  <div class="flex justify-between">
-                    <span class="text-slate-500">Bayar:</span>
-                    <span class="font-semibold text-slate-800 tabular-nums">{formatRupiah(hasilTransaksi.pesanan.bayar)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                    <span>Bayar:</span>
+                    <span>{formatRupiah(hasilTransaksi.pesanan.bayar)}</span>
                   </div>
-                  <div class="flex justify-between pt-1 border-t border-slate-200 font-bold text-emerald-700">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
                     <span>Kembalian:</span>
-                    <span class="tabular-nums">{formatRupiah(hasilTransaksi.pesanan.kembalian)}</span>
+                    <span>{formatRupiah(hasilTransaksi.pesanan.kembalian)}</span>
                   </div>
                 </div>
-              </div>
 
-              {/* Tombol Cetak & Bagikan */}
-              <div class="grid grid-cols-2 gap-2 my-2">
-                <button
-                  type="button"
-                  onClick={handleCetak}
-                  class="py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                >
-                  <IconPrinter size={15} color="#334155" />
-                  <span>Cetak (58mm)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBagikan}
-                  class="py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                >
-                  <IconShare size={15} color="#334155" />
-                  <span>Bagikan Struk</span>
-                </button>
+                <div style={{ borderTop: '1px dashed #000', paddingTop: '6px', marginTop: '6px', textAlign: 'center', fontSize: '10px', lineHeight: 1.3 }}>
+                  {profilStruk.pesanFooter && <div>{profilStruk.pesanFooter}</div>}
+                  {profilStruk.instagram && <div>IG: {profilStruk.instagram}</div>}
+                  {profilStruk.wifiInfo && <div>{profilStruk.wifiInfo}</div>}
+                  <div style={{ marginTop: '4px', fontSize: '9px' }}>Selamat Menikmati Hidangan!</div>
+                </div>
               </div>
             </div>
-
-            {/* Tombol Pesanan Baru */}
-            <div class="pt-2">
-              <button
-                type="button"
-                onClick={handlePesananBaru}
-                class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-extrabold tracking-wide cursor-pointer transition-all shadow-md"
-              >
-                Selesai / Pesanan Baru ›
-              </button>
-            </div>
-
-            {/* Template Cetak Fisik Thermal 58 mm */}
-            <div class="struk-print-area" style={{ display: 'none' }}>
-              <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-                <strong style={{ fontSize: '13px' }}>MITARASA</strong>
-                <div>Ayam Goreng Tradisional</div>
-              </div>
-              <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', margin: '4px 0' }}>
-                <div>No. Antrean: <strong>{hasilTransaksi.nomorAntreanFormatted}</strong></div>
-                <div>Kode: {hasilTransaksi.kodeTransaksi}</div>
-                <div>Tgl: {new Date(hasilTransaksi.pesanan.waktu).toLocaleString('id-ID')}</div>
-                <div>Kasir: {sessionSignal.value?.nama || 'Kasir'}</div>
-              </div>
-              <div style={{ margin: '4px 0' }}>
-                {hasilTransaksi.itemPesanan.map((it) => (
-                  <div key={it.id} style={{ marginBottom: '4px' }}>
-                    <div>{it.qty}x {it.nama_produk}</div>
-                    {it.tambahan.map((t) => (
-                      <div key={t.nama} style={{ paddingLeft: '8px', fontSize: '10px' }}>
-                        + {t.nama} ({formatRupiah(t.harga)})
-                      </div>
-                    ))}
-                    <div style={{ textAlign: 'right' }}>
-                      {formatRupiah((it.harga_satuan + it.tambahan.reduce((s, x) => s + x.harga * x.qty, 0)) * it.qty)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ borderTop: '1px dashed #000', paddingTop: '4px', margin: '4px 0' }}>
-                <div>Total: <strong>{formatRupiah(hasilTransaksi.pesanan.total)}</strong></div>
-                <div>Bayar ({hasilTransaksi.pesanan.metode.toUpperCase()}): {formatRupiah(hasilTransaksi.pesanan.bayar)}</div>
-                <div>Kembalian: {formatRupiah(hasilTransaksi.pesanan.kembalian)}</div>
-                {hasilTransaksi.pesanan.catatan && <div>Catatan: {hasilTransaksi.pesanan.catatan}</div>}
-              </div>
-              <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '10px' }}>
-                <div>Terima Kasih!</div>
-                <div>Selamat Menikmati Hidangan</div>
-              </div>
-            </div>
-          </div>
-        ) : (
+          );
+        })() : (
           /* ── TAMPILAN 2: FORM PEMBAYARAN POP-UP FLEKSIBEL ── */
           <div class="flex flex-col flex-1 overflow-hidden">
             {/* Header Pop-up dengan Tombol Tutup & Tambah Menu */}

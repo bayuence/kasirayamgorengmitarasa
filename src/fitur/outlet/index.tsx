@@ -173,7 +173,9 @@ export function LayarKelolaOutlet() {
 
   const handlePilihCabang = (o: OutletItem) => {
     pilihOutletAktif(o);
-    notifikasi(`Kasir perangkat ini disetel ke cabang: ${o.nama}`);
+    notifikasi(`Kasir beralih ke cabang: ${o.nama}`);
+    // Otomatis buka layar format struk untuk cabang yang dipilih
+    window.location.hash = `#/struk?outlet=${o.id}`;
   };
 
   const handleToggleAktif = async (o: OutletItem) => {
@@ -586,29 +588,57 @@ export function LayarKelolaOutlet() {
 
                   {/* Baris Aksi Terstruktur (Tier 1 & Tier 2) */}
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', marginTop: '4px' }}>
-                    {/* Tier 1: Atur Harga per Toko */}
-                    <a
-                      href={`#/harga-outlet?outlet=${o.id}`}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '9px 12px',
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        fontSize: '0.8125rem',
-                        fontWeight: 600,
-                        color: '#0f172a',
-                        textDecoration: 'none',
-                        marginBottom: '8px',
-                      }}
-                    >
-                      <span>Atur Menu & Harga Khusus Toko Ini</span>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
-                    </a>
+                    {/* Tier 1: Atur Format Struk & Atur Harga per Toko */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '8px' }}>
+                      <a
+                        href={`#/struk?outlet=${o.id}`}
+                        onClick={() => pilihOutletAktif(o)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '8px 10px',
+                          background: '#0f172a',
+                          border: '1px solid #0f172a',
+                          borderRadius: '8px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: '#ffffff',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="6 9 6 2 18 2 18 9" />
+                          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                          <rect x="6" y="14" width="12" height="8" />
+                        </svg>
+                        <span>Atur Struk</span>
+                      </a>
+
+                      <a
+                        href={`#/harga-outlet?outlet=${o.id}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '8px 10px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: '#0f172a',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        <span>Menu & Harga</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                      </a>
+                    </div>
 
                     {/* Tier 2: Edit, Status, & Hapus */}
                     <div style={{ display: 'flex', gap: '6px' }}>

@@ -1,11 +1,12 @@
 const formatter = new Intl.NumberFormat('id-ID', {
   style: 'currency',
   currency: 'IDR',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 
 export function formatRupiah(amount: number): string {
-  return formatter.format(amount).replace('Rp', 'Rp ');
+  return formatter.format(amount || 0).replace('Rp', 'Rp ');
 }
+
 

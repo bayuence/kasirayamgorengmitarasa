@@ -106,9 +106,9 @@ export async function simpanTransaksiBaru(
   const waktuISO = new Date().toISOString();
   const kasirId = sessionSignal.value?.id || 'kasir-lokal';
 
-  // Ambil shift_id aktif jika ada
-  const shiftAktif = await db.get('meta', 'shift_aktif_id');
-  const shiftId = (shiftAktif?.val as string) || null;
+  // Ambil uang_awal_id aktif jika ada
+  const uangAwalAktif = (await db.get('meta', 'uang_awal_aktif_id')) || (await db.get('meta', 'shift_aktif_id'));
+  const uangAwalId = (uangAwalAktif?.val as string) || null;
 
   const dataPesanan: PesananItem = {
     id: pesananId,
@@ -125,7 +125,8 @@ export async function simpanTransaksiBaru(
     kembalian: params.kembalian,
     catatan: params.catatan || null,
     alasan_batal: null,
-    shift_id: shiftId,
+    uang_awal_id: uangAwalId,
+    shift_id: uangAwalId,
     kasir_id: kasirId,
     outlet_id: outletAktifSignal.value?.id || null,
   };

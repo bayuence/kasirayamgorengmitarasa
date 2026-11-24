@@ -23,11 +23,15 @@ export function inisialisasiOutletAktif(): OutletItem | null {
     try {
       const parsed = JSON.parse(raw);
       if (parsed.id && parsed.namaToko) {
+        let cleanAlamat = (parsed.alamat || '').replace(/Lokasi Presensi:\s*/gi, '').trim();
+        if (cleanAlamat.toLowerCase() === 'ayam goreng lodan' || cleanAlamat.toLowerCase() === parsed.namaToko.toLowerCase()) {
+          cleanAlamat = '';
+        }
         const item: OutletItem = {
           id: parsed.id,
           kode: parsed.kode || '',
           nama: parsed.namaToko || parsed.nama || 'Ayam Goreng Mitarasa',
-          alamat: parsed.alamat || '',
+          alamat: cleanAlamat,
           telepon: parsed.telepon || '',
           catatan_struk: parsed.pesanFooter || 'Terima kasih atas kunjungan Anda!',
           aktif: true,
@@ -52,71 +56,157 @@ export function pilihOutletAktif(outlet: OutletItem): void {
   outletAktifSignal.value = outlet;
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem('mitarasa_outlet_aktif_id', outlet.id);
-    const legacy = {
+    // Pertahankan preferensi logo, slogan, sosmed & kertas yang sudah disetel pengguna per-outlet
+    let existing: any = {};
+    const perOutletRaw = localStorage.getItem(`mitarasa_profil_struk_${outlet.id}`);
+    const globalRaw = localStorage.getItem('mitarasa_profil_outlet');
+    const raw = perOutletRaw || globalRaw;
+    if (raw) {
+      try { existing = JSON.parse(raw); } catch {}
+    }
+
+    let cleanAlamat = (outlet.alamat || '').replace(/Lokasi Presensi:\s*/gi, '').trim();
+    if (cleanAlamat.toLowerCase() === 'ayam goreng lodan' || cleanAlamat.toLowerCase() === outlet.nama.toLowerCase()) {
+      cleanAlamat = '';
+    }
+
+    const updated = {
+      ...existing,
       id: outlet.id,
       kode: outlet.kode,
       namaToko: outlet.nama,
-      alamat: outlet.alamat,
-      telepon: outlet.telepon,
-      pesanFooter: outlet.catatan_struk,
+      alamat: cleanAlamat,
+      telepon: outlet.telepon || '',
+      slogan: existing.slogan !== undefined ? existing.slogan : 'Ayam Goreng Tradisional & Sambal Khas',
+      instagram: existing.instagram !== undefined ? existing.instagram : '@ayamgorengmitarasa',
+      wifiInfo: existing.wifiInfo !== undefined ? existing.wifiInfo : '',
+      logoUrl: existing.logoUrl || '',
+      tampilkanLogo: existing.tampilkanLogo !== undefined ? Boolean(existing.tampilkanLogo) : true,
+      tampilkanAntreanBesar: existing.tampilkanAntreanBesar !== undefined ? Boolean(existing.tampilkanAntreanBesar) : true,
+      pesanFooter: outlet.catatan_struk || existing.pesanFooter || 'Terima kasih atas kunjungan Anda!',
       sumber: outlet.sumber || 'manual',
       presensi_location_id: outlet.presensi_location_id || null,
       kodePerangkat: localStorage.getItem('mitarasa_kode_perangkat') || 'A',
-      ukuranKertas: '58mm',
+      ukuranKertas: existing.ukuranKertas || '58mm',
     };
-    localStorage.setItem('mitarasa_profil_outlet', JSON.stringify(legacy));
+    localStorage.setItem(`mitarasa_profil_struk_${outlet.id}`, JSON.stringify(updated));
+    localStorage.setItem('mitarasa_profil_outlet', JSON.stringify(updated));
   }
 }
 
-/**
- * Profil struk kasir
- */
-export function getProfilOutlet(): {
+export interface ProfilStrukOutlet {
   id: string;
   kode: string;
   namaToko: string;
+  slogan: string;
   alamat: string;
   telepon: string;
+  instagram: string;
+  wifiInfo: string;
   sumber?: 'manual' | 'presensi';
   kodePerangkat: string;
   pesanFooter: string;
   ukuranKertas: '58mm' | '80mm';
-} {
-  const current = outletAktifSignal.value || inisialisasiOutletAktif();
+  logoUrl: string;
+  tampilkanLogo: boolean;
+  tampilkanAntreanBesar: boolean;
+}
+
+/**
+ * Profil struk kasir dan preferensi cetak
+ * Data nama toko, alamat, telepon, dan pesan footer OTOMATIS menyesuaikan outlet aktif kasir!
+ */
+export function getProfilOutlet(outletId?: string): ProfilStrukOutlet {
+  const current = (outletId ? (null as any) : outletAktifSignal.value) || inisialisasiOutletAktif();
+  const targetId = outletId || current?.id || 'default';
+  
   let kodePerangkat = 'A';
   let ukuranKertas: '58mm' | '80mm' = '58mm';
+  let slogan = 'Ayam Goreng Tradisional & Sambal Khas';
+  let instagram = '@ayamgorengmitarasa';
+  let wifiInfo = '';
+  let logoUrl = '';
+  let tampilkanLogo = true;
+  let tampilkanAntreanBesar = true;
 
   if (typeof localStorage !== 'undefined') {
     kodePerangkat = localStorage.getItem('mitarasa_kode_perangkat') || 'A';
-    const raw = localStorage.getItem('mitarasa_profil_outlet');
+    
+    // Coba baca profil per-outlet spesifik terlebih dahulu
+    const perOutletRaw = localStorage.getItem(`mitarasa_profil_struk_${targetId}`);
+    const globalRaw = localStorage.getItem('mitarasa_profil_outlet');
+    const raw = perOutletRaw || globalRaw;
+
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
         if (parsed.ukuranKertas) ukuranKertas = parsed.ukuranKertas;
+        if (parsed.slogan !== undefined) slogan = parsed.slogan;
+        if (parsed.instagram !== undefined) instagram = parsed.instagram;
+        if (parsed.wifiInfo !== undefined) wifiInfo = parsed.wifiInfo;
+        if (parsed.logoUrl !== undefined) logoUrl = parsed.logoUrl;
+        if (parsed.tampilkanLogo !== undefined) tampilkanLogo = Boolean(parsed.tampilkanLogo);
+        if (parsed.tampilkanAntreanBesar !== undefined) tampilkanAntreanBesar = Boolean(parsed.tampilkanAntreanBesar);
       } catch {}
     }
   }
 
+  // Identitas cabang (nama toko, alamat, telepon, pesan footer) OTOMATIS 100% mengikuti outlet kasir!
+  const namaToko = current?.nama || 'Ayam Goreng Mitarasa';
+  let rawAlamat = (current?.alamat || '').replace(/Lokasi Presensi:\s*/gi, '').trim();
+  if (rawAlamat.toLowerCase() === 'ayam goreng lodan' || rawAlamat.toLowerCase() === namaToko.toLowerCase()) {
+    rawAlamat = '';
+  }
+  const alamat = rawAlamat;
+  const telepon = current?.telepon || '';
+  const pesanFooter = current?.catatan_struk || 'Terima kasih atas kunjungan Anda!';
+
   return {
-    id: current?.id || '',
+    id: current?.id || targetId,
     kode: current?.kode || '',
-    namaToko: current?.nama || 'Ayam Goreng Mitarasa',
-    alamat: current?.alamat || '',
-    telepon: current?.telepon || '',
+    namaToko,
+    slogan,
+    alamat,
+    telepon,
+    instagram,
+    wifiInfo,
     sumber: current?.sumber || 'manual',
     kodePerangkat,
-    pesanFooter: current?.catatan_struk || 'Terima kasih atas kunjungan Anda!',
+    pesanFooter,
     ukuranKertas,
+    logoUrl,
+    tampilkanLogo,
+    tampilkanAntreanBesar,
   };
 }
 
-export function simpanProfilOutlet(profil: any): void {
+export function simpanProfilOutlet(profil: Partial<ProfilStrukOutlet>, targetOutletId?: string): void {
   if (typeof localStorage !== 'undefined') {
-    const current = getProfilOutlet();
+    const activeId = targetOutletId || outletAktifSignal.value?.id || 'default';
+    const current = getProfilOutlet(activeId);
     const updated = { ...current, ...profil };
+    
+    // Simpan baik di kunci per-outlet maupun di kunci global aktif
+    localStorage.setItem(`mitarasa_profil_struk_${activeId}`, JSON.stringify(updated));
     localStorage.setItem('mitarasa_profil_outlet', JSON.stringify(updated));
+
     if (profil.kodePerangkat) {
       localStorage.setItem('mitarasa_kode_perangkat', profil.kodePerangkat.toUpperCase());
+    }
+
+    // Jika ada outlet aktif yang sedang dibuka, sinkronkan nama, alamat, telepon, dan catatan_struk
+    if (outletAktifSignal.value && (!targetOutletId || targetOutletId === outletAktifSignal.value.id)) {
+      const outletBaru = {
+        ...outletAktifSignal.value,
+        nama: updated.namaToko || outletAktifSignal.value.nama,
+        alamat: updated.alamat !== undefined ? updated.alamat : outletAktifSignal.value.alamat,
+        telepon: updated.telepon !== undefined ? updated.telepon : outletAktifSignal.value.telepon,
+        catatan_struk: updated.pesanFooter || outletAktifSignal.value.catatan_struk,
+      };
+      outletAktifSignal.value = outletBaru;
+
+      // Sync ke IndexedDB & Supabase secara background
+      simpanOutletAdmin(outletBaru).catch(() => {});
     }
   }
 }
@@ -139,7 +229,13 @@ export async function muatSemuaOutlet(): Promise<OutletItem[]> {
         .order('dibuat_pada', { ascending: true });
 
       if (!error && data) {
-        outlets = data as OutletItem[];
+        outlets = (data as OutletItem[]).map((it) => {
+          let cleanAlamat = (it.alamat || '').replace(/Lokasi Presensi:\s*/gi, '').trim();
+          if (cleanAlamat.toLowerCase() === 'ayam goreng lodan' || cleanAlamat.toLowerCase() === it.nama.toLowerCase()) {
+            cleanAlamat = '';
+          }
+          return { ...it, alamat: cleanAlamat };
+        });
 
         // Bersihkan dan perbarui cache IndexedDB
         try {
@@ -184,7 +280,13 @@ export async function muatSemuaOutlet(): Promise<OutletItem[]> {
     if (db && db.objectStoreNames.contains('outlet')) {
       const local = await db.getAll('outlet');
       if (local && local.length > 0) {
-        outlets = local;
+        outlets = local.map((it) => {
+          let cleanAlamat = (it.alamat || '').replace(/Lokasi Presensi:\s*/gi, '').trim();
+          if (cleanAlamat.toLowerCase() === 'ayam goreng lodan' || cleanAlamat.toLowerCase() === it.nama.toLowerCase()) {
+            cleanAlamat = '';
+          }
+          return { ...it, alamat: cleanAlamat };
+        });
       }
     }
   } catch (err) {
@@ -251,7 +353,7 @@ export async function imporOutletDariPresensi(
     id: lokasi.id || crypto.randomUUID(),
     kode: kodeOutlet,
     nama: namaOutlet,
-    alamat: `Lokasi Presensi: ${cleanName}`,
+    alamat: '',
     telepon: '',
     catatan_struk: `Terima kasih atas kunjungan Anda di Mitarasa ${subName || cleanName}!`,
     aktif: true,
@@ -284,10 +386,14 @@ export async function sinkronkanCabangDariPresensi(): Promise<{ diubah: number; 
         const namaTerbaru = subName ? `Ayam Goreng Mitarasa - ${subName}` : `Ayam Goreng Mitarasa - ${cleanName}`;
         const kodeTerbaru = (subName || cleanName).replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
 
-        if (o.nama !== namaTerbaru || o.kode !== kodeTerbaru) {
+        if (o.nama !== namaTerbaru || o.kode !== kodeTerbaru || (o.alamat && o.alamat.includes('Lokasi Presensi'))) {
           o.nama = namaTerbaru;
           o.kode = kodeTerbaru;
-          o.alamat = `Lokasi Presensi: ${cleanName}`;
+          let cleanAlamat = (o.alamat || '').replace(/Lokasi Presensi:\s*/gi, '').trim();
+          if (cleanAlamat.toLowerCase() === 'ayam goreng lodan' || cleanAlamat.toLowerCase() === namaTerbaru.toLowerCase()) {
+            cleanAlamat = '';
+          }
+          o.alamat = cleanAlamat;
           o.diubah_pada = new Date().toISOString();
           await simpanOutletAdmin(o);
           diubah++;

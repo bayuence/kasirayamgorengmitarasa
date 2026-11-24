@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { getLocalDB, type ShiftItem, type OutboxItem } from '../../data/db.js';
+import { getLocalDB, type UangAwalItem, type OutboxItem } from '../../data/db.js';
 import { formatRupiah } from '../../util/rupiah.js';
 import { sessionSignal } from '../../state/sesi.js';
 import { pendingOutboxCountSignal } from '../../state/sinkron.js';
@@ -7,6 +7,12 @@ import { prosesOutbox } from '../../data/sync.js';
 import { getSupabase } from '../../data/supabase.js';
 import { IconUangAwal } from '../../komponen/Ikon.js';
 import { IconCheck, IconPlus, IconMinus, IconTutup } from '../../komponen/Icon.js';
+import {
+  formatTanggalPanjang,
+  formatTanggalAngka,
+  formatWaktu,
+  formatWaktuDetik,
+} from '../../util/tanggal.js';
 
 // Daftar pecahan uang rupiah yang umum disiapkan tim keuangan untuk kembalian
 const PECAHAN_DEFAULT = [
@@ -22,47 +28,22 @@ const PECAHAN_DEFAULT = [
 
 function getHariTanggalIndo(dateStr: string): string {
   if (!dateStr) return '';
-  const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`);
-  return d.toLocaleDateString('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  return formatTanggalPanjang(dateStr);
 }
 
 function formatWaktuLengkap(isoString?: string | null): string {
   if (!isoString) return '-';
-  const d = new Date(isoString);
-  const tanggal = d.toLocaleDateString('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-  const jam = d.toLocaleTimeString('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-  return `${tanggal} pukul ${jam} WIB`;
+  return `${formatTanggalPanjang(isoString)} pukul ${formatWaktuDetik(isoString)}`;
 }
 
 function formatJamDetik(isoString?: string | null): string {
   if (!isoString) return '-';
-  const d = new Date(isoString);
-  return (
-    d.toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }) + ' WIB'
-  );
+  return formatWaktuDetik(isoString);
 }
 
 export function LayarUangAwal() {
-  const [shiftAktif, setShiftAktif] = useState<ShiftItem | null>(null);
-  const [riwayatShift, setRiwayatShift] = useState<ShiftItem[]>([]);
+  const [uangAwalAktif, setUangAwalAktif] = useState<UangAwalItem | null>(null);
+  const [riwayatUangAwal, setRiwayatUangAwal] = useState<UangAwalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [pesanSukses, setPesanSukses] = useState('');
 
@@ -93,9 +74,9 @@ export function LayarUangAwal() {
   // ── State Tutup Kasir / Akhir Toko ──
   const [kasAkhirInput, setKasAkhirInput] = useState<number>(0);
   const [catatanTutup, setCatatanTutup] = useState<string>('');
-  const [totalTunaiShift, setTotalTunaiShift] = useState<number>(0);
-  const [totalQrisShift, setTotalQrisShift] = useState<number>(0);
-  const [jumlahPesananShift, setJumlahPesananShift] = useState<number>(0);
+  const [totalTunai, setTotalTunai] = useState<number>(0);
+  const [totalQris, setTotalQris] = useState<number>(0);
+  const [jumlahPesanan, setJumlahPesanan] = useState<number>(0);
   const [detailRiwayatBuka, setDetailRiwayatBuka] = useState<string | null>(null);
 
   // Live timer jam:menit:detik
@@ -121,7 +102,7 @@ export function LayarUangAwal() {
   };
 
   // Muat data shift lokal & sinkronkan dari Supabase
-  const muatDataShift = async () => {
+  const muatDataUangAwal = async () => {
     setLoading(true);
     const db = await getLocalDB();
 
@@ -130,15 +111,15 @@ export function LayarUangAwal() {
       try {
         const supabase = await getSupabase();
         const { data: remoteShifts, error } = await supabase
-          .from('shift')
+          .from('uang_awal')
           .select('*')
           .order('buka_pada', { ascending: false })
           .limit(30);
 
         if (!error && remoteShifts && remoteShifts.length > 0) {
-          const tx = db.transaction('shift', 'readwrite');
+          const tx = db.transaction('uang_awal', 'readwrite');
           for (const s of remoteShifts) {
-            await tx.objectStore('shift').put(s as ShiftItem);
+            await tx.objectStore('uang_awal').put(s as UangAwalItem);
           }
           await tx.done;
         }
@@ -148,23 +129,23 @@ export function LayarUangAwal() {
     }
 
     // 2. Cek status uang modal / shift aktif
-    const metaAktif = await db.get('meta', 'shift_aktif_id');
-    let aktif: ShiftItem | null = null;
+    const metaAktif = await db.get('meta', 'uang_awal_aktif_id');
+    let aktif: UangAwalItem | null = null;
 
     if (metaAktif && typeof metaAktif.val === 'string') {
-      const item = await db.get('shift', metaAktif.val);
+      const item = await db.get('uang_awal', metaAktif.val);
       if (item && !item.tutup_pada) {
         aktif = item;
       }
     }
 
-    setShiftAktif(aktif);
+    setUangAwalAktif(aktif);
 
     if (aktif) {
-      // Hitung total penjualan tunai & QRIS shift ini
+      // Hitung total penjualan tunai & QRIS sesi ini
       const semuaPesanan = await db.getAll('pesanan');
       const pesananShiftIni = semuaPesanan.filter(
-        (p) => p.shift_id === aktif?.id && p.status === 'selesai',
+        (p) => (p.uang_awal_id || p.shift_id) === aktif?.id && p.status === 'selesai',
       );
 
       let tunai = 0;
@@ -174,24 +155,24 @@ export function LayarUangAwal() {
         else if (p.metode === 'qris') qris += p.total;
       }
 
-      setTotalTunaiShift(tunai);
-      setTotalQrisShift(qris);
-      setJumlahPesananShift(pesananShiftIni.length);
+      setTotalTunai(tunai);
+      setTotalQris(qris);
+      setJumlahPesanan(pesananShiftIni.length);
       setKasAkhirInput(aktif.kas_awal + tunai);
     }
 
-    // 3. Muat seluruh riwayat shift yang sudah ditutup
-    const semuaShift = await db.getAll('shift');
+    // 3. Muat seluruh riwayat uang awal yang sudah ditutup
+    const semuaShift = await db.getAll('uang_awal');
     const closed = semuaShift
       .filter((s) => Boolean(s.tutup_pada))
       .sort((a, b) => new Date(b.buka_pada).getTime() - new Date(a.buka_pada).getTime());
-    setRiwayatShift(closed);
+    setRiwayatUangAwal(closed);
 
     setLoading(false);
   };
 
   useEffect(() => {
-    muatDataShift();
+    muatDataUangAwal();
   }, []);
 
   // Handler ubah jumlah lembar pecahan uang
@@ -211,7 +192,7 @@ export function LayarUangAwal() {
   };
 
   // Simpan Uang Modal Awal Toko & Buka Kasir
-  const handleBukaShift = async (e: Event) => {
+  const handleBukaUangAwal = async (e: Event) => {
     e.preventDefault();
     if (kasAwalInput < 0) {
       alert('Modal uang awal tidak boleh minus.');
@@ -224,7 +205,7 @@ export function LayarUangAwal() {
     const kasirId = sessionSignal.value?.id || 'kasir-lokal';
     const kasirNama = sessionSignal.value?.nama || 'Kasir';
 
-    const dataBaru: ShiftItem = {
+    const dataBaru: UangAwalItem = {
       id: shiftId,
       kasir_id: kasirId,
       kasir_nama: kasirNama,
@@ -244,16 +225,16 @@ export function LayarUangAwal() {
 
     const outboxItem: OutboxItem = {
       id: crypto.randomUUID(),
-      tabel: 'shift',
+      tabel: 'uang_awal',
       data: dataBaru,
       waktu: waktuISO,
       status: 'pending',
       percobaan: 0,
     };
 
-    const tx = db.transaction(['shift', 'meta', 'outbox'], 'readwrite');
-    await tx.objectStore('shift').put(dataBaru);
-    await tx.objectStore('meta').put({ key: 'shift_aktif_id', val: shiftId });
+    const tx = db.transaction(['uang_awal', 'meta', 'outbox'], 'readwrite');
+    await tx.objectStore('uang_awal').put(dataBaru);
+    await tx.objectStore('meta').put({ key: 'uang_awal_aktif_id', val: shiftId });
     await tx.objectStore('outbox').put(outboxItem);
     await tx.done;
 
@@ -261,53 +242,53 @@ export function LayarUangAwal() {
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       try {
         const supabase = await getSupabase();
-        await supabase.from('shift').upsert(dataBaru);
+        await supabase.from('uang_awal').upsert(dataBaru);
       } catch {}
       prosesOutbox().catch(() => {});
     }
 
     notifikasi(`Uang awal toko Rp ${kasAwalInput.toLocaleString('id-ID')} berhasil disimpan untuk tanggal ${getHariTanggalIndo(tanggalOperasional)}!`);
-    await muatDataShift();
+    await muatDataUangAwal();
   };
 
   // Tutup Kasir & Simpan Rekapitulasi Lengkap
-  const handleTutupShift = async (e: Event) => {
+  const handleTutupKasir = async (e: Event) => {
     e.preventDefault();
-    if (!shiftAktif) return;
+    if (!uangAwalAktif) return;
 
     const konfirmasi = confirm(
-      `Tutup kasir sekarang?\nEstimasi uang fisik di laci: ${formatRupiah(shiftAktif.kas_awal + totalTunaiShift)}\nUang dihitung: ${formatRupiah(kasAkhirInput)}`
+      `Tutup kasir sekarang?\nEstimasi uang fisik di laci: ${formatRupiah(uangAwalAktif.kas_awal + totalTunai)}\nUang dihitung: ${formatRupiah(kasAkhirInput)}`
     );
     if (!konfirmasi) return;
 
     const db = await getLocalDB();
     const waktuTutup = new Date().toISOString();
-    const estimasiKas = shiftAktif.kas_awal + totalTunaiShift;
+    const estimasiKas = uangAwalAktif.kas_awal + totalTunai;
     const selisih = kasAkhirInput - estimasiKas;
 
-    const updatedShift: ShiftItem = {
-      ...shiftAktif,
+    const updatedShift: UangAwalItem = {
+      ...uangAwalAktif,
       tutup_pada: waktuTutup,
       kas_akhir: kasAkhirInput,
       selisih,
-      total_tunai: totalTunaiShift,
-      total_qris: totalQrisShift,
-      jumlah_pesanan: jumlahPesananShift,
-      catatan: catatanTutup.trim() ? `${shiftAktif.catatan ? shiftAktif.catatan + ' | ' : ''}Tutup: ${catatanTutup.trim()}` : shiftAktif.catatan,
+      total_tunai: totalTunai,
+      total_qris: totalQris,
+      jumlah_pesanan: jumlahPesanan,
+      catatan: catatanTutup.trim() ? `${uangAwalAktif.catatan ? uangAwalAktif.catatan + ' | ' : ''}Tutup: ${catatanTutup.trim()}` : uangAwalAktif.catatan,
     };
 
     const outboxItem: OutboxItem = {
       id: crypto.randomUUID(),
-      tabel: 'shift',
+      tabel: 'uang_awal',
       data: updatedShift,
       waktu: waktuTutup,
       status: 'pending',
       percobaan: 0,
     };
 
-    const tx = db.transaction(['shift', 'meta', 'outbox'], 'readwrite');
-    await tx.objectStore('shift').put(updatedShift);
-    await tx.objectStore('meta').delete('shift_aktif_id');
+    const tx = db.transaction(['uang_awal', 'meta', 'outbox'], 'readwrite');
+    await tx.objectStore('uang_awal').put(updatedShift);
+    await tx.objectStore('meta').delete('uang_awal_aktif_id');
     await tx.objectStore('outbox').put(outboxItem);
     await tx.done;
 
@@ -315,13 +296,13 @@ export function LayarUangAwal() {
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       try {
         const supabase = await getSupabase();
-        await supabase.from('shift').upsert(updatedShift);
+        await supabase.from('uang_awal').upsert(updatedShift);
       } catch {}
       prosesOutbox().catch(() => {});
     }
 
     notifikasi('Operasional kasir berhasil ditutup dan rekap harian telah tersimpan!');
-    await muatDataShift();
+    await muatDataUangAwal();
   };
 
   if (loading) {
@@ -372,12 +353,12 @@ export function LayarUangAwal() {
         {/* ═══════════════════════════════════════════════════════════════ */}
         {/* KONDISI 1: BELUM ADA SESI UANG AWAL AKTIF (FORM INPUT AWAL)     */}
         {/* ═══════════════════════════════════════════════════════════════ */}
-        {!shiftAktif ? (
+        {!uangAwalAktif ? (
           <div class="space-y-4">
             {/* Kartu Informasi & Panduan */}
             <div class="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-xs text-amber-950 leading-relaxed shadow-2xs">
               <div class="flex items-start gap-2.5">
-                <span class="text-base leading-none">💡</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="shrink-0 mt-0.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                 <div>
                   <strong class="font-bold block mb-1">Catatan Modal Uang Kembalian Kasir:</strong>
                   Uang awal ini adalah modal kas yang diserahkan tim keuangan (biasanya dalam pecahan uang kecil seperti Rp 2.000, Rp 5.000, Rp 10.000, dst.) untuk kembalian pelanggan. Uang ini <strong>bukan omzet</strong> dan akan otomatis dipisahkan dari rekap penjualan bersih toko.
@@ -386,7 +367,7 @@ export function LayarUangAwal() {
             </div>
 
             {/* Form Input Uang Modal Awal */}
-            <form onSubmit={handleBukaShift} class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-4">
+            <form onSubmit={handleBukaUangAwal} class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-4">
               {/* 1. Pemilihan Tanggal Operasional */}
               <div>
                 <label class="block text-xs font-bold text-slate-800 mb-1.5">
@@ -597,7 +578,7 @@ export function LayarUangAwal() {
                   </span>
                 </div>
                 <span class="text-[11px] font-semibold text-slate-500">
-                  {getHariTanggalIndo(shiftAktif.tanggal || shiftAktif.buka_pada)}
+                  {getHariTanggalIndo(uangAwalAktif.tanggal || uangAwalAktif.buka_pada)}
                 </span>
               </div>
 
@@ -605,30 +586,30 @@ export function LayarUangAwal() {
                 <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                   <span class="text-[10px] text-slate-400 font-bold block uppercase">Waktu Buka / Jam Masuk:</span>
                   <strong class="text-slate-800 text-xs block font-mono mt-0.5">
-                    {formatJamDetik(shiftAktif.buka_pada)}
+                    {formatJamDetik(uangAwalAktif.buka_pada)}
                   </strong>
                   <span class="text-[10px] text-slate-500">
-                    {new Date(shiftAktif.buka_pada).toLocaleDateString('id-ID')}
+                    {formatTanggalAngka(uangAwalAktif.buka_pada)}
                   </span>
                 </div>
 
                 <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                   <span class="text-[10px] text-slate-400 font-bold block uppercase">Petugas Kasir:</span>
                   <strong class="text-slate-800 text-xs block truncate mt-0.5">
-                    {shiftAktif.kasir_nama || 'Kasir Bertugas'}
+                    {uangAwalAktif.kasir_nama || 'Kasir Bertugas'}
                   </strong>
                   <span class="text-[10px] text-amber-700 font-medium">
-                    Sumber: {shiftAktif.sumber_dana || 'Tim Keuangan'}
+                    Sumber: {uangAwalAktif.sumber_dana || 'Tim Keuangan'}
                   </span>
                 </div>
               </div>
 
               {/* Rincian Pecahan jika ada */}
-              {shiftAktif.rincian_pecahan && Object.values(shiftAktif.rincian_pecahan).some((v) => v > 0) && (
+              {uangAwalAktif.rincian_pecahan && Object.values(uangAwalAktif.rincian_pecahan).some((v) => v > 0) && (
                 <div class="p-2.5 bg-amber-50/60 rounded-xl border border-amber-200/60 text-[11px] text-amber-950">
                   <span class="font-bold block mb-1">Rincian Lembaran Uang Awal:</span>
                   <div class="flex flex-wrap gap-1.5">
-                    {Object.entries(shiftAktif.rincian_pecahan)
+                    {Object.entries(uangAwalAktif.rincian_pecahan)
                       .filter(([_, qty]) => qty > 0)
                       .map(([nom, qty]) => (
                         <span key={nom} class="px-2 py-0.5 bg-white border border-amber-200 rounded-md text-[10px] font-semibold font-mono">
@@ -645,7 +626,7 @@ export function LayarUangAwal() {
               <h3 class="text-xs font-black uppercase tracking-wider text-slate-700 pb-2 border-b border-slate-100 flex items-center justify-between">
                 <span>Rekap Keuangan Transaksi Kasir</span>
                 <span class="text-[10px] font-bold text-slate-500 font-mono">
-                  {jumlahPesananShift} Transaksi Lunas
+                  {jumlahPesanan} Transaksi Lunas
                 </span>
               </h3>
 
@@ -657,7 +638,7 @@ export function LayarUangAwal() {
                     <span class="text-[10px] text-amber-700">Wajib dikembalikan ke kas/keuangan laci</span>
                   </div>
                   <strong class="text-sm font-extrabold text-amber-900 tabular-nums font-mono">
-                    {formatRupiah(shiftAktif.kas_awal)}
+                    {formatRupiah(uangAwalAktif.kas_awal)}
                   </strong>
                 </div>
 
@@ -668,7 +649,7 @@ export function LayarUangAwal() {
                     <span class="text-[10px] text-emerald-700">Uang tunai fisik pembeli yang masuk ke laci</span>
                   </div>
                   <strong class="text-sm font-extrabold text-emerald-800 tabular-nums font-mono">
-                    +{formatRupiah(totalTunaiShift)}
+                    +{formatRupiah(totalTunai)}
                   </strong>
                 </div>
 
@@ -679,7 +660,7 @@ export function LayarUangAwal() {
                     <span class="text-[10px] text-indigo-700">Non-tunai, langsung masuk rekening toko</span>
                   </div>
                   <strong class="text-sm font-extrabold text-indigo-800 tabular-nums font-mono">
-                    +{formatRupiah(totalQrisShift)}
+                    +{formatRupiah(totalQris)}
                   </strong>
                 </div>
 
@@ -687,7 +668,7 @@ export function LayarUangAwal() {
                 <div class="flex items-center justify-between pt-1 px-1 text-[11px] text-slate-500">
                   <span>Total Seluruh Omzet Penjualan (Tunai + QRIS):</span>
                   <span class="font-bold text-slate-800 tabular-nums">
-                    {formatRupiah(totalTunaiShift + totalQrisShift)}
+                    {formatRupiah(totalTunai + totalQris)}
                   </span>
                 </div>
 
@@ -695,10 +676,10 @@ export function LayarUangAwal() {
                 <div class="pt-2 border-t border-slate-100 flex items-center justify-between p-3 bg-slate-900 text-white rounded-xl shadow-xs">
                   <div>
                     <span class="text-xs font-bold block">Total Uang Fisik Seharusnya di Laci:</span>
-                    <span class="text-[10px] text-slate-300">Modal Awal ({formatRupiah(shiftAktif.kas_awal)}) + Tunai ({formatRupiah(totalTunaiShift)})</span>
+                    <span class="text-[10px] text-slate-300">Modal Awal ({formatRupiah(uangAwalAktif.kas_awal)}) + Tunai ({formatRupiah(totalTunai)})</span>
                   </div>
                   <strong class="text-base font-black tabular-nums font-mono text-emerald-400">
-                    {formatRupiah(shiftAktif.kas_awal + totalTunaiShift)}
+                    {formatRupiah(uangAwalAktif.kas_awal + totalTunai)}
                   </strong>
                 </div>
               </div>
@@ -707,10 +688,10 @@ export function LayarUangAwal() {
               <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs">
                 <span class="text-slate-500 text-[11px]">Uang Murni yang Disetor ke Tim Keuangan: </span>
                 <strong class="text-slate-900 font-extrabold font-mono text-xs">
-                  {formatRupiah(totalTunaiShift)}
+                  {formatRupiah(totalTunai)}
                 </strong>
                 <span class="text-[10px] text-slate-400 block mt-0.5">
-                  (Modal awal {formatRupiah(shiftAktif.kas_awal)} tetap tersimpan di laci untuk modal besok)
+                  (Modal awal {formatRupiah(uangAwalAktif.kas_awal)} tetap tersimpan di laci untuk modal besok)
                 </span>
               </div>
             </div>
@@ -721,7 +702,7 @@ export function LayarUangAwal() {
                 Tutup Kasir & Hitung Fisik Uang Akhir:
               </h3>
 
-              <form onSubmit={handleTutupShift} class="space-y-3">
+              <form onSubmit={handleTutupKasir} class="space-y-3">
                 <div>
                   <label class="block text-[11px] font-bold text-slate-700 mb-1">
                     Hitung Uang Fisik Aktual di Laci (Uang Awal + Tunai):
@@ -742,7 +723,7 @@ export function LayarUangAwal() {
 
                 {/* Status Selisih */}
                 {(() => {
-                  const estimasi = shiftAktif.kas_awal + totalTunaiShift;
+                  const estimasi = uangAwalAktif.kas_awal + totalTunai;
                   const selisih = kasAkhirInput - estimasi;
                   return (
                     <div
@@ -797,24 +778,24 @@ export function LayarUangAwal() {
         <div class="pt-4 border-t border-slate-200">
           <div class="flex items-center justify-between mb-3">
             <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-800">
-              Riwayat Uang Awal & Rekap Kasir ({riwayatShift.length})
+              Riwayat Uang Awal & Rekap Kasir ({riwayatUangAwal.length})
             </h3>
             <button
               type="button"
-              onClick={muatDataShift}
+              onClick={muatDataUangAwal}
               class="text-[11px] font-bold text-slate-600 hover:text-slate-900 cursor-pointer border-none bg-transparent"
             >
               🔄 Refresh
             </button>
           </div>
 
-          {riwayatShift.length === 0 ? (
+          {riwayatUangAwal.length === 0 ? (
             <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-xs text-slate-400">
               Belum ada riwayat uang awal atau kasir yang ditutup.
             </div>
           ) : (
             <div class="space-y-3">
-              {riwayatShift.map((s) => {
+              {riwayatUangAwal.map((s) => {
                 const isDetail = detailRiwayatBuka === s.id;
                 const estimasi = (s.kas_awal || 0) + (s.total_tunai || 0);
                 const selisih = (s.kas_akhir || 0) - estimasi;

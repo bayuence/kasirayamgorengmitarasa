@@ -49,10 +49,10 @@ export async function prosesOutbox(): Promise<void> {
           const { error } = await supabase.from('item_pesanan').upsert(item.data);
           if (!error) sukses = true;
           else console.warn('Gagal upsert item_pesanan ke server:', error);
-        } else if (item.tabel === 'shift') {
-          const { error } = await supabase.from('shift').upsert(item.data);
+        } else if (item.tabel === 'uang_awal' || (item.tabel as any) === 'shift') {
+          const { error } = await supabase.from('uang_awal').upsert(item.data);
           if (!error) sukses = true;
-          else console.warn('Gagal upsert shift ke server:', error);
+          else console.warn('Gagal upsert uang_awal ke server:', error);
         } else if (item.tabel === 'batal_pesanan') {
           const { error } = await supabase.rpc('batalkan_pesanan', {
             p_id: item.data.id,

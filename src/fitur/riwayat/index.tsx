@@ -4,6 +4,7 @@ import { getTanggalLokal, formatNomorAntrean, batalkanPesananLokal } from '../..
 import { formatRupiah } from '../../util/rupiah.js';
 import { formatTeksStruk, bagikanStruk } from '../../util/struk.js';
 import { sessionSignal } from '../../state/sesi.js';
+import { formatTanggalPanjang, formatWaktu, formatTanggalWaktu, formatStrukWaktu } from '../../util/tanggal.js';
 
 interface PesananDenganItem {
   pesanan: PesananItem;
@@ -107,7 +108,7 @@ export function LayarRiwayat() {
           Riwayat Hari Ini
         </h2>
         <p style={{ color: 'var(--muted)', fontSize: '0.8125rem' }}>
-          Daftar pesanan toko Mitarasa per {new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
+          Daftar pesanan toko Mitarasa per {formatTanggalPanjang(new Date())}
         </p>
       </div>
 
@@ -143,10 +144,7 @@ export function LayarRiwayat() {
       ) : (
         <div class="no-print" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {pesananTersaring.map((item) => {
-            const waktu = new Date(item.pesanan.waktu).toLocaleTimeString('id-ID', {
-              hour: '2-digit',
-              minute: '2-digit',
-            });
+            const waktu = formatWaktu(item.pesanan.waktu, false);
             const isBatal = item.pesanan.status === 'batal';
 
             return (
@@ -252,7 +250,7 @@ export function LayarRiwayat() {
                   </span>
                 )}
                 <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-                  {new Date(pesananDipilih.pesanan.waktu).toLocaleString('id-ID')}
+                  {formatTanggalWaktu(pesananDipilih.pesanan.waktu)}
                 </span>
               </div>
               <button
@@ -477,7 +475,7 @@ export function LayarRiwayat() {
           <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', margin: '4px 0' }}>
             <div>No. Antrean: <strong>{pesananDipilih.nomorAntrean}</strong></div>
             {pesananDipilih.pesanan.kode_transaksi && <div>Kode: {pesananDipilih.pesanan.kode_transaksi}</div>}
-            <div>Tgl: {new Date(pesananDipilih.pesanan.waktu).toLocaleString('id-ID')}</div>
+            <div>Tgl: {formatStrukWaktu(pesananDipilih.pesanan.waktu)}</div>
             {pesananDipilih.pesanan.status === 'batal' && (
               <div>STATUS: <strong>DIBATALKAN</strong></div>
             )}

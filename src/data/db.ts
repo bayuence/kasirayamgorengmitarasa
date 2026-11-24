@@ -80,6 +80,7 @@ export interface PesananItem {
   kembalian: number;
   catatan?: string | null;
   alasan_batal?: string | null;
+  uang_awal_id?: string | null;
   shift_id?: string | null;
   kasir_id: string;
   outlet_id?: string | null;
@@ -95,7 +96,7 @@ export interface ItemPesananDetail {
   tambahan: Array<{ nama: string; harga: number; qty: number }>;
 }
 
-export interface ShiftItem {
+export interface UangAwalItem {
   id: string;
   kasir_id: string;
   kasir_nama?: string;
@@ -113,12 +114,12 @@ export interface ShiftItem {
   rincian_pecahan?: Record<string, number> | null;
 }
 
-// Alias untuk nama fitur baru
-export type UangAwalItem = ShiftItem;
+// Alias backward compatibility
+export type ShiftItem = UangAwalItem;
 
 export interface OutboxItem {
   id: string;
-  tabel: 'pesanan' | 'item_pesanan' | 'shift' | 'batal_pesanan';
+  tabel: 'pesanan' | 'item_pesanan' | 'uang_awal' | 'shift' | 'batal_pesanan';
   data: any;
   waktu: string;
   status: 'pending' | 'syncing' | 'failed';
@@ -166,9 +167,13 @@ export interface MitarasaDBSchema extends DBSchema {
     value: ItemPesananDetail;
     indexes: { 'by-pesanan': string };
   };
+  uang_awal: {
+    key: string;
+    value: UangAwalItem;
+  };
   shift: {
     key: string;
-    value: ShiftItem;
+    value: UangAwalItem;
   };
   outbox: {
     key: string;
@@ -184,7 +189,7 @@ let dbPromise: Promise<IDBPDatabase<MitarasaDBSchema>> | null = null;
 
 export function getLocalDB(): Promise<IDBPDatabase<MitarasaDBSchema>> {
   if (!dbPromise) {
-    dbPromise = openDB<MitarasaDBSchema>('mitarasa-kasir-db', 3, {
+    dbPromise = openDB<MitarasaDBSchema>('mitarasa-kasir-db', 4, {
       upgrade(db) {
         // Store kategori
         if (!db.objectStoreNames.contains('kategori')) {
@@ -226,7 +231,11 @@ export function getLocalDB(): Promise<IDBPDatabase<MitarasaDBSchema>> {
           const itemStore = db.createObjectStore('item_pesanan', { keyPath: 'id' });
           itemStore.createIndex('by-pesanan', 'pesanan_id');
         }
-        // Store shift
+        // Store uang_awal
+        if (!db.objectStoreNames.contains('uang_awal')) {
+          db.createObjectStore('uang_awal', { keyPath: 'id' });
+        }
+        // Store shift (kompatibilitas)
         if (!db.objectStoreNames.contains('shift')) {
           db.createObjectStore('shift', { keyPath: 'id' });
         }
