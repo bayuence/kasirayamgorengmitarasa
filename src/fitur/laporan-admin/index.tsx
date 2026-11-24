@@ -113,11 +113,11 @@ export function LayarLaporanAdmin() {
   const topProduk = Object.values(itemTerjualMap).sort((a, b) => b.qty - a.qty);
 
   // Analisis Per-Toko / Cabang
-  const outletMap: Record<string, { nama: string; omzet: number; tunai: number; qris: number; biaya: number; trx: number }> = {};
+  const outletMap: Record<string, { nama: string; kode?: string; omzet: number; tunai: number; qris: number; biaya: number; trx: number }> = {};
   for (const o of daftarOutlet) {
-    outletMap[o.id] = { nama: o.nama, omzet: 0, tunai: 0, qris: 0, biaya: 0, trx: 0 };
+    outletMap[o.id] = { nama: o.nama, kode: o.kode, omzet: 0, tunai: 0, qris: 0, biaya: 0, trx: 0 };
   }
-  outletMap['tanpa_outlet'] = { nama: 'Outlet Lain / Pusat', omzet: 0, tunai: 0, qris: 0, biaya: 0, trx: 0 };
+  outletMap['tanpa_outlet'] = { nama: 'Outlet Lain / Pusat', kode: 'PUSAT', omzet: 0, tunai: 0, qris: 0, biaya: 0, trx: 0 };
 
   for (const p of pesananSelesai) {
     const key = p.outlet_id && outletMap[p.outlet_id] ? p.outlet_id : 'tanpa_outlet';
@@ -132,9 +132,40 @@ export function LayarLaporanAdmin() {
     outletMap[key].biaya += b.nominal || 0;
   }
 
-  const listOutletRekap = Object.entries(outletMap)
-    .filter(([_, v]) => v.omzet > 0 || v.biaya > 0 || v.trx > 0)
-    .map(([id, v]) => ({ id, ...v }));
+  // Tampilkan SEMUA cabang toko yang terdaftar di database, bukan hanya yang ada transaksinya
+  const listOutletRekap = daftarOutlet.map((o) => {
+    const stat = outletMap[o.id] || { omzet: 0, tunai: 0, qris: 0, biaya: 0, trx: 0 };
+    return {
+      id: o.id,
+      kode: o.kode,
+      nama: o.nama,
+      omzet: stat.omzet,
+      tunai: stat.tunai,
+      qris: stat.qris,
+      biaya: stat.biaya,
+      trx: stat.trx,
+      saldo: stat.omzet - stat.biaya,
+    };
+  });
+
+  // Jika ada transaksi yang tidak terkait outlet id tertentu, tampilkan sebagai baris tambahan
+  if (outletMap['tanpa_outlet'] && (outletMap['tanpa_outlet'].omzet > 0 || outletMap['tanpa_outlet'].biaya > 0 || outletMap['tanpa_outlet'].trx > 0)) {
+    listOutletRekap.push({
+      id: 'tanpa_outlet',
+      kode: 'PUSAT',
+      nama: 'Outlet Lain / Pusat',
+      omzet: outletMap['tanpa_outlet'].omzet,
+      tunai: outletMap['tanpa_outlet'].tunai,
+      qris: outletMap['tanpa_outlet'].qris,
+      biaya: outletMap['tanpa_outlet'].biaya,
+      trx: outletMap['tanpa_outlet'].trx,
+      saldo: outletMap['tanpa_outlet'].omzet - outletMap['tanpa_outlet'].biaya,
+    });
+  }
+
+  const listOutletDitampilkan = outletPilih === 'semua'
+    ? listOutletRekap
+    : listOutletRekap.filter((o) => o.id === outletPilih);
 
   return (
     <div class="min-h-screen bg-slate-50 pb-28 text-slate-900">
@@ -219,7 +250,7 @@ export function LayarLaporanAdmin() {
           <div class="flex items-center gap-1.5 mt-3 overflow-x-auto pb-1 text-xs font-bold">
             {[
               { id: 'ringkasan', label: 'Ringkasan Keuangan' },
-              { id: 'outlet', label: `Performa Cabang (${listOutletRekap.length})` },
+              { id: 'outlet', label: `Performa Cabang (${daftarOutlet.length})` },
               { id: 'transaksi', label: `Daftar Penjualan (${pesananSelesai.length})` },
               { id: 'pengeluaran', label: `Biaya & Pengeluaran (${pengeluaranList.length})` },
               { id: 'produk', label: `Menu Terlaris (${topProduk.length})` },
@@ -385,13 +416,27 @@ export function LayarLaporanAdmin() {
             {/* ── TAB 2: PERFORMA CABANG / TOKO ── */}
             {tabAktif === 'outlet' && (
               <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
-                <div class="p-3.5 border-b border-slate-100 bg-slate-50/60">
+                <div class="p-3.5 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
                   <h3 class="text-xs font-black uppercase tracking-wider text-slate-800">
-                    Perbandingan Performa Toko / Cabang
+                    Perbandingan Performa Toko / Cabang ({listOutletDitampilkan.length} Cabang)
                   </h3>
+                  <a
+                    href="#/outlet"
+                    class="text-[11px] font-bold text-blue-600 hover:underline"
+                  >
+                    + Kelola / Tambah Cabang &rarr;
+                  </a>
                 </div>
-                {listOutletRekap.length === 0 ? (
-                  <p class="text-xs text-slate-400 py-10 text-center">Belum ada data cabang pada periode ini</p>
+                {listOutletDitampilkan.length === 0 ? (
+                  <div class="py-12 text-center text-slate-400 space-y-2">
+                    <p class="text-xs font-bold text-slate-600">Belum ada cabang toko terdaftar di database</p>
+                    <a
+                      href="#/outlet"
+                      class="inline-block px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold"
+                    >
+                      Buka Kelola Cabang
+                    </a>
+                  </div>
                 ) : (
                   <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-xs">
@@ -407,20 +452,54 @@ export function LayarLaporanAdmin() {
                         </tr>
                       </thead>
                       <tbody class="divide-y divide-slate-100 font-medium">
-                        {listOutletRekap.map((o) => (
+                        {listOutletDitampilkan.map((o) => (
                           <tr key={o.id} class="hover:bg-slate-50/60 transition-colors">
-                            <td class="p-3 font-bold text-slate-900">{o.nama}</td>
-                            <td class="p-3 text-center font-bold">{o.trx} Nota</td>
-                            <td class="p-3 text-right text-emerald-700">{formatRupiah(o.tunai)}</td>
-                            <td class="p-3 text-right text-indigo-700">{formatRupiah(o.qris)}</td>
+                            <td class="p-3">
+                              <div class="flex items-center gap-2">
+                                <span class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-black text-slate-700">
+                                  {o.kode || '-'}
+                                </span>
+                                <span class="font-bold text-slate-900">{o.nama}</span>
+                              </div>
+                            </td>
+                            <td class="p-3 text-center font-bold text-slate-700">
+                              {o.trx} Nota
+                            </td>
+                            <td class="p-3 text-right font-semibold text-emerald-700">{formatRupiah(o.tunai)}</td>
+                            <td class="p-3 text-right font-semibold text-indigo-700">{formatRupiah(o.qris)}</td>
                             <td class="p-3 text-right font-black text-slate-900">{formatRupiah(o.omzet)}</td>
-                            <td class="p-3 text-right text-rose-600">-{formatRupiah(o.biaya)}</td>
+                            <td class="p-3 text-right font-semibold text-rose-600">
+                              {o.biaya > 0 ? `-${formatRupiah(o.biaya)}` : formatRupiah(0)}
+                            </td>
                             <td class="p-3 text-right font-black text-slate-900">
-                              {formatRupiah(o.omzet - o.biaya)}
+                              {formatRupiah(o.saldo)}
                             </td>
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot>
+                        <tr class="bg-slate-50/80 border-t-2 border-slate-200 font-black text-slate-900">
+                          <td class="p-3">TOTAL KESELURUHAN</td>
+                          <td class="p-3 text-center">
+                            {listOutletDitampilkan.reduce((s, o) => s + o.trx, 0)} Nota
+                          </td>
+                          <td class="p-3 text-right text-emerald-700">
+                            {formatRupiah(listOutletDitampilkan.reduce((s, o) => s + o.tunai, 0))}
+                          </td>
+                          <td class="p-3 text-right text-indigo-700">
+                            {formatRupiah(listOutletDitampilkan.reduce((s, o) => s + o.qris, 0))}
+                          </td>
+                          <td class="p-3 text-right">
+                            {formatRupiah(listOutletDitampilkan.reduce((s, o) => s + o.omzet, 0))}
+                          </td>
+                          <td class="p-3 text-right text-rose-600">
+                            -{formatRupiah(listOutletDitampilkan.reduce((s, o) => s + o.biaya, 0))}
+                          </td>
+                          <td class="p-3 text-right">
+                            {formatRupiah(listOutletDitampilkan.reduce((s, o) => s + o.saldo, 0))}
+                          </td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 )}
