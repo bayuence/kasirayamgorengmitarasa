@@ -226,7 +226,7 @@ export async function muatSemuaOutlet(): Promise<OutletItem[]> {
       const { data, error } = await supabase
         .from('outlet')
         .select('*')
-        .order('dibuat_pada', { ascending: true });
+        .order('diubah_pada', { ascending: true });
 
       if (!error && data) {
         outlets = (data as OutletItem[]).map((it) => {
