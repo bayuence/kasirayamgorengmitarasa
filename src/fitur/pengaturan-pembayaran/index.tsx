@@ -108,6 +108,21 @@ export function LayarPengaturanPembayaran() {
         setOutletTerpilihId('utama');
       });
     setPetaQrisOutlet(muatSemuaQrisOutlet());
+    const refreshSemua = () => {
+      muatSemuaOutlet().then((outlets) => {
+        if (outlets && outlets.length > 0) {
+          setDaftarOutlet(outlets);
+          setOutletTerpilihId((prev) => prev || outlets[0].id);
+        }
+      });
+      setPetaQrisOutlet(muatSemuaQrisOutlet());
+    };
+
+    const handleUpdate = () => {
+      refreshSemua();
+    };
+    window.addEventListener('mitarasa:data-updated', handleUpdate);
+    return () => window.removeEventListener('mitarasa:data-updated', handleUpdate);
   }, []);
 
   const notif = (teks: string, isErr = false) => {

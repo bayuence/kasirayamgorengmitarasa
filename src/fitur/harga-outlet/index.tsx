@@ -117,21 +117,31 @@ export function LayarHargaOutlet() {
   useEffect(() => {
     sinkronkanMenuDariSupabase().catch(() => {});
 
-    Promise.all([muatSemuaOutlet(), muatSemuaKategori()]).then(([outlets, kategoris]) => {
-      setDaftarOutlet(outlets);
-      setDaftarKategori(kategoris);
+    const refreshData = () => {
+      Promise.all([muatSemuaOutlet(), muatSemuaKategori()]).then(([outlets, kategoris]) => {
+        setDaftarOutlet(outlets);
+        setDaftarKategori(kategoris);
 
-      const hash = window.location.hash;
-      const match = hash.match(/outlet=([^&]+)/);
-      const urlOutletId = match ? match[1] : null;
+        const hash = window.location.hash;
+        const match = hash.match(/outlet=([^&]+)/);
+        const urlOutletId = match ? match[1] : null;
 
-      const targetId = urlOutletId || outletAktifSignal.value?.id || (outlets[0] ? outlets[0].id : '');
-      setOutletTerpilih(targetId);
+        const targetId = urlOutletId || outletAktifSignal.value?.id || (outlets[0] ? outlets[0].id : '');
+        setOutletTerpilih(targetId);
 
-      if (targetId) {
-        muatDataHarga(targetId);
-      }
-    });
+        if (targetId) {
+          muatDataHarga(targetId);
+        }
+      });
+    };
+
+    refreshData();
+
+    const handleUpdate = () => {
+      refreshData();
+    };
+    window.addEventListener('mitarasa:data-updated', handleUpdate);
+    return () => window.removeEventListener('mitarasa:data-updated', handleUpdate);
   }, []);
 
   const muatDataHarga = async (outletId: string) => {

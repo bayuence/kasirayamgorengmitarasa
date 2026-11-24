@@ -41,6 +41,11 @@ export function LayarKelolaOutlet() {
 
   useEffect(() => {
     muatData();
+    const handleUpdate = () => {
+      muatData();
+    };
+    window.addEventListener('mitarasa:data-updated', handleUpdate);
+    return () => window.removeEventListener('mitarasa:data-updated', handleUpdate);
   }, []);
 
   const muatData = async () => {
