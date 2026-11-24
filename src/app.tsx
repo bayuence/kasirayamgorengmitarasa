@@ -4,6 +4,8 @@ import { LayarKasir } from './fitur/kasir/index.js';
 import { LayarBayar } from './fitur/bayar/index.js';
 import { LayarRiwayat } from './fitur/riwayat/index.js';
 import { LayarRiwayatAdmin } from './fitur/riwayat-admin/index.js';
+import { LayarPengeluaran } from './fitur/pengeluaran/index.js';
+import { LayarPengeluaranAdmin } from './fitur/pengeluaran-admin/index.js';
 import { LayarUangAwal } from './fitur/uang-awal/index.js';
 import { LayarLaporan } from './fitur/laporan/index.js';
 import { LayarKelolaProduk } from './fitur/produk/index.js';
@@ -125,6 +127,8 @@ export function App() {
       case '#/bayar':        return <LayarKasir bukaBayarAwal={true} />;
       case '#/riwayat':      return <LayarRiwayat />;
       case '#/riwayat-admin': return <LayarRiwayatAdmin />;
+      case '#/pengeluaran':   return <LayarPengeluaran />;
+      case '#/pengeluaran-admin': return <LayarPengeluaranAdmin />;
       case '#/uang-awal':
       case '#/shift':        return <LayarUangAwal />;
       case '#/laporan':      return <LayarLaporan />;

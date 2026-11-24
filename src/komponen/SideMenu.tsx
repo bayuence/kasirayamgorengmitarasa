@@ -319,6 +319,13 @@ export function SideMenu({ isOpen, onClose, currentRoute }: SideMenuProps) {
               onClick={() => handlePindah('#/uang-awal')}
             />
             <MenuRow
+              ikon={<IconDompet size={18} />}
+              label="Pengeluaran Toko"
+              sublabel="Catat biaya operasional harian"
+              aktif={baseRoute === '#/pengeluaran'}
+              onClick={() => handlePindah('#/pengeluaran')}
+            />
+            <MenuRow
               ikon={<IconLaporan size={18} />}
               label="Laporan Penjualan"
               aktif={baseRoute === '#/laporan'}
@@ -350,6 +357,13 @@ export function SideMenu({ isOpen, onClose, currentRoute }: SideMenuProps) {
                 sublabel="Semua riwayat transaksi toko & audit"
                 aktif={baseRoute === '#/riwayat-admin'}
                 onClick={() => handlePindah('#/riwayat-admin')}
+              />
+              <MenuRow
+                ikon={<IconDompet size={18} />}
+                label="Pengeluaran (Admin)"
+                sublabel="Audit & rekap seluruh pengeluaran cabang"
+                aktif={baseRoute === '#/pengeluaran-admin'}
+                onClick={() => handlePindah('#/pengeluaran-admin')}
               />
               <MenuRow
                 ikon={<IconMenu size={18} />}

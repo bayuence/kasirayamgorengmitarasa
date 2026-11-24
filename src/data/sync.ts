@@ -65,6 +65,14 @@ export async function prosesOutbox(): Promise<void> {
           const { error } = await supabase.from('pesanan').delete().eq('id', item.data.id);
           if (!error) sukses = true;
           else console.warn('Gagal hapus pesanan dari cloud:', error);
+        } else if ((item.tabel as any) === 'pengeluaran') {
+          const { error } = await supabase.from('pengeluaran').upsert(item.data);
+          if (!error) sukses = true;
+          else console.warn('Gagal upsert pengeluaran ke server:', error);
+        } else if ((item.tabel as any) === 'hapus_pengeluaran') {
+          const { error } = await supabase.from('pengeluaran').delete().eq('id', item.data.id);
+          if (!error) sukses = true;
+          else console.warn('Gagal hapus pengeluaran dari server:', error);
         }
 
         if (sukses) {

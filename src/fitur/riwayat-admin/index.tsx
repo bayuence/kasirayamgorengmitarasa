@@ -12,6 +12,7 @@ import { formatRupiah } from '../../util/rupiah.js';
 import { formatTeksStruk, bagikanStruk } from '../../util/struk.js';
 import { sessionSignal } from '../../state/sesi.js';
 import { muatSemuaOutlet } from '../../data/outlet.js';
+import { muatPengeluaran } from '../../data/pengeluaran.js';
 import { getSupabase } from '../../data/supabase.js';
 import { pendingOutboxCountSignal } from '../../state/sinkron.js';
 import { prosesOutbox } from '../../data/sync.js';
@@ -49,6 +50,7 @@ export function LayarRiwayatAdmin() {
   const [loading, setLoading] = useState(true);
   const [daftarOutlet, setDaftarOutlet] = useState<OutletItem[]>([]);
   const [mapHppProduk, setMapHppProduk] = useState<Map<string, number>>(new Map());
+  const [totalPengeluaranOperasional, setTotalPengeluaranOperasional] = useState<number>(0);
 
   // Modal Detail & Edit
   const [pesananDipilih, setPesananDipilih] = useState<PesananDenganItem | null>(null);
@@ -144,6 +146,14 @@ export function LayarRiwayatAdmin() {
     }
 
     setDaftarPesanan(hasil);
+
+    // Muat juga total pengeluaran operasional toko pada tanggal/outlet tersebut
+    try {
+      const listBiaya = await muatPengeluaran(tanggalPilih, outletPilih);
+      const sumBiaya = listBiaya.reduce((s, b) => s + (b.nominal || 0), 0);
+      setTotalPengeluaranOperasional(sumBiaya);
+    } catch {}
+
     setLoading(false);
   };
 
@@ -528,21 +538,21 @@ export function LayarRiwayatAdmin() {
                 +{formatRupiah(totalLabaKotor)}
               </span>
               <p class="text-[9px] text-blue-700 mt-0.5 leading-tight">
-                Hasil murni (Omzet dikurangi Modal HPP bahan)
+                Omzet dikurangi Modal Pokok Bahan
               </p>
             </div>
 
-            {/* 4. LABA BERSIH ESTIMASI */}
+            {/* 4. LABA BERSIH REALISTIS */}
             <div class="bg-emerald-50/90 border border-emerald-300 rounded-xl p-3 shadow-2xs">
               <div class="flex items-center justify-between">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800">4. Laba Bersih</span>
                 <span class="text-[9px] px-1.5 py-0.2 bg-emerald-200 text-emerald-900 rounded font-black">Netto</span>
               </div>
               <span class="text-base font-black text-emerald-950 block mt-1 tabular-nums">
-                +{formatRupiah(totalLabaKotor)}
+                +{formatRupiah(Math.max(0, totalLabaKotor - totalPengeluaranOperasional))}
               </span>
               <p class="text-[9px] text-emerald-800 mt-0.5 leading-tight">
-                Keuntungan bersih operasional menu toko
+                Laba Kotor - Biaya Operasional ({formatRupiah(totalPengeluaranOperasional)})
               </p>
             </div>
           </div>
@@ -550,13 +560,18 @@ export function LayarRiwayatAdmin() {
           {/* Keterangan Rumus Transparan untuk User/Owner */}
           <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <strong class="text-slate-800 font-bold">Rumus Keuangan: </strong>
-              <span>Omzet ({formatRupiah(totalOmzetLunas)}) - Modal HPP ({formatRupiah(totalHppSemua)}) = </span>
-              <strong class="text-emerald-700 font-extrabold">Laba Bersih (+{formatRupiah(totalLabaKotor)})</strong>
+              <strong class="text-slate-800 font-bold">Rumus Laba Bersih: </strong>
+              <span>Laba Kotor ({formatRupiah(totalLabaKotor)}) - Pengeluaran ({formatRupiah(totalPengeluaranOperasional)}) = </span>
+              <strong class="text-emerald-700 font-black">
+                Laba Bersih (+{formatRupiah(Math.max(0, totalLabaKotor - totalPengeluaranOperasional))})
+              </strong>
             </div>
-            <span class="text-[10px] text-slate-400 font-semibold">
-              *Jika harga produk per menu diisi HPP-nya di menu produk, margin akan 100% presisi akurat
-            </span>
+            <a
+              href="#/pengeluaran-admin"
+              class="text-indigo-600 hover:text-indigo-800 font-bold underline"
+            >
+              Lihat Rincian Pengeluaran →
+            </a>
           </div>
         </div>
 

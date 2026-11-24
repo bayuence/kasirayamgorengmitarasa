@@ -96,6 +96,22 @@ export interface ItemPesananDetail {
   tambahan: Array<{ nama: string; harga: number; qty: number }>;
 }
 
+export interface PengeluaranItem {
+  id: string;
+  tanggal: string; // YYYY-MM-DD
+  waktu: string;   // ISO timestamp
+  kategori: string; // 'Bahan Baku & Dapur' | 'Operasional & Listrik/Air' | 'Gas & Minyak' | 'Plastik & Kemasan' | 'Gaji & Uang Makan' | 'Lain-lain'
+  keterangan: string;
+  nominal: number;
+  metode: 'tunai' | 'transfer';
+  outlet_id?: string | null;
+  outlet_nama?: string | null;
+  kasir_id?: string | null;
+  kasir_nama?: string | null;
+  bukti_foto?: string | null;
+  diubah_pada: string;
+}
+
 export interface UangAwalItem {
   id: string;
   kasir_id: string;
@@ -179,6 +195,11 @@ export interface MitarasaDBSchema extends DBSchema {
     key: string;
     value: OutboxItem;
   };
+  pengeluaran: {
+    key: string;
+    value: PengeluaranItem;
+    indexes: { 'by-tanggal': string; 'by-outlet': string };
+  };
   meta: {
     key: string;
     value: { key: string; val: any };
@@ -189,7 +210,7 @@ let dbPromise: Promise<IDBPDatabase<MitarasaDBSchema>> | null = null;
 
 export function getLocalDB(): Promise<IDBPDatabase<MitarasaDBSchema>> {
   if (!dbPromise) {
-    dbPromise = openDB<MitarasaDBSchema>('mitarasa-kasir-db', 4, {
+    dbPromise = openDB<MitarasaDBSchema>('mitarasa-kasir-db', 5, {
       upgrade(db) {
         // Store kategori
         if (!db.objectStoreNames.contains('kategori')) {
@@ -238,6 +259,12 @@ export function getLocalDB(): Promise<IDBPDatabase<MitarasaDBSchema>> {
         // Store shift (kompatibilitas)
         if (!db.objectStoreNames.contains('shift')) {
           db.createObjectStore('shift', { keyPath: 'id' });
+        }
+        // Store pengeluaran operasional toko
+        if (!db.objectStoreNames.contains('pengeluaran')) {
+          const pengeluaranStore = db.createObjectStore('pengeluaran', { keyPath: 'id' });
+          pengeluaranStore.createIndex('by-tanggal', 'tanggal');
+          pengeluaranStore.createIndex('by-outlet', 'outlet_id');
         }
         // Store outbox (antrean sinkronisasi)
         if (!db.objectStoreNames.contains('outbox')) {
