@@ -352,6 +352,13 @@ export function SideMenu({ isOpen, onClose, currentRoute }: SideMenuProps) {
               </span>
 
               <MenuRow
+                ikon={<IconLaporan size={18} />}
+                label="Laporan (Admin)"
+                sublabel="Audit & laporan lengkap seluruh cabang"
+                aktif={baseRoute === '#/laporan-admin'}
+                onClick={() => handlePindah('#/laporan-admin')}
+              />
+              <MenuRow
                 ikon={<IconRiwayat size={18} />}
                 label="Riwayat Transaksi (Admin)"
                 sublabel="Semua riwayat transaksi toko & audit"

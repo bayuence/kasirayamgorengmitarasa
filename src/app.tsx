@@ -8,6 +8,7 @@ import { LayarPengeluaran } from './fitur/pengeluaran/index.js';
 import { LayarPengeluaranAdmin } from './fitur/pengeluaran-admin/index.js';
 import { LayarUangAwal } from './fitur/uang-awal/index.js';
 import { LayarLaporan } from './fitur/laporan/index.js';
+import { LayarLaporanAdmin } from './fitur/laporan-admin/index.js';
 import { LayarKelolaProduk } from './fitur/produk/index.js';
 import { LayarKelolaTambahan } from './fitur/tambahan/index.js';
 import { LayarKelolaOutlet } from './fitur/outlet/index.js';
@@ -134,6 +135,7 @@ export function App() {
       case '#/uang-awal':
       case '#/shift':        return <LayarUangAwal />;
       case '#/laporan':      return <LayarLaporan />;
+      case '#/laporan-admin': return <LayarLaporanAdmin />;
       case '#/produk':       return <LayarKelolaProduk />;
       case '#/tambahan':     return <LayarKelolaTambahan />;
       case '#/outlet':       return <LayarKelolaOutlet />;
