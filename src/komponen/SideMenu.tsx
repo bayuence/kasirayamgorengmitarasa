@@ -47,6 +47,7 @@ export function SideMenu({ isOpen, onClose, currentRoute }: SideMenuProps) {
 
   const userRole = session?.roleOriginal || (session?.peran === 'owner' ? 'Admin' : 'Karyawan');
   const userDivisi = session?.divisi || 'Operasional';
+  const isAdmin = userRole.toLowerCase().includes('admin') || userRole.toLowerCase().includes('owner') || session?.peran === 'owner';
 
   return (
     <div
@@ -325,66 +326,75 @@ export function SideMenu({ isOpen, onClose, currentRoute }: SideMenuProps) {
             />
           </div>
 
-          {/* SECTION 2: ADMINISTRASI */}
-          <div>
-            <span
-              style={{
-                fontSize: '0.6875rem',
-                fontWeight: 700,
-                color: '#94a3b8',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                padding: '0 10px',
-                display: 'block',
-                marginBottom: '6px',
-              }}
-            >
-              Administrasi & Pengaturan
-            </span>
+          {/* SECTION 2: ADMIN */}
+          {isAdmin && (
+            <div>
+              <span
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 700,
+                  color: '#94a3b8',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  padding: '0 10px',
+                  display: 'block',
+                  marginBottom: '6px',
+                }}
+              >
+                ADMIN
+              </span>
 
-            <MenuRow
-              ikon={<IconMenu size={18} />}
-              label="Katalog Menu & Kategori"
-              sublabel="Atur foto, kategori, HPP modal & margin"
-              aktif={baseRoute === '#/produk'}
-              onClick={() => handlePindah('#/produk')}
-            />
-            <MenuRow
-              ikon={<IconTambahan size={18} />}
-              label="Item Tambahan (Add-ons)"
-              sublabel="Nasi daun jeruk, sambal, dll"
-              aktif={baseRoute === '#/tambahan'}
-              onClick={() => handlePindah('#/tambahan')}
-            />
-            <MenuRow
-              ikon={<IconOutlet size={18} />}
-              label="Lokasi & Cabang Toko"
-              sublabel="Daftar cabang & pilih toko kasir"
-              aktif={baseRoute === '#/outlet'}
-              onClick={() => handlePindah('#/outlet')}
-            />
-            <MenuRow
-              ikon={<IconKasir size={18} />}
-              label="Atur Menu & Harga per Toko"
-              sublabel="Penetapan harga cabang & margin keuntungan"
-              aktif={baseRoute === '#/harga-outlet'}
-              onClick={() => handlePindah('#/harga-outlet')}
-            />
-            <MenuRow
-              ikon={<IconDompet size={18} />}
-              label="Atur Metode Pembayaran"
-              sublabel="Pecahan uang tunai & QRIS dinamis toko"
-              aktif={baseRoute === '#/metode-pembayaran'}
-              onClick={() => handlePindah('#/metode-pembayaran')}
-            />
-            <MenuRow
-              ikon={<IconStruk size={18} />}
-              label="Format Struk & Printer"
-              sublabel="Lebar kertas 58mm, catatan footer"
-              aktif={baseRoute === '#/struk'}
-              onClick={() => handlePindah('#/struk')}
-            />
-          </div>
+              <MenuRow
+                ikon={<IconRiwayat size={18} />}
+                label="Riwayat Transaksi (Admin)"
+                sublabel="Semua riwayat transaksi toko & audit"
+                aktif={baseRoute === '#/riwayat-admin'}
+                onClick={() => handlePindah('#/riwayat-admin')}
+              />
+              <MenuRow
+                ikon={<IconMenu size={18} />}
+                label="Katalog Menu & Kategori"
+                sublabel="Atur foto, kategori, HPP modal & margin"
+                aktif={baseRoute === '#/produk'}
+                onClick={() => handlePindah('#/produk')}
+              />
+              <MenuRow
+                ikon={<IconTambahan size={18} />}
+                label="Item Tambahan (Add-ons)"
+                sublabel="Nasi daun jeruk, sambal, dll"
+                aktif={baseRoute === '#/tambahan'}
+                onClick={() => handlePindah('#/tambahan')}
+              />
+              <MenuRow
+                ikon={<IconOutlet size={18} />}
+                label="Lokasi & Cabang Toko"
+                sublabel="Daftar cabang & pilih toko kasir"
+                aktif={baseRoute === '#/outlet'}
+                onClick={() => handlePindah('#/outlet')}
+              />
+              <MenuRow
+                ikon={<IconKasir size={18} />}
+                label="Atur Menu & Harga per Toko"
+                sublabel="Penetapan harga cabang & margin keuntungan"
+                aktif={baseRoute === '#/harga-outlet'}
+                onClick={() => handlePindah('#/harga-outlet')}
+              />
+              <MenuRow
+                ikon={<IconDompet size={18} />}
+                label="Atur Metode Pembayaran"
+                sublabel="Pecahan uang tunai & QRIS dinamis toko"
+                aktif={baseRoute === '#/metode-pembayaran'}
+                onClick={() => handlePindah('#/metode-pembayaran')}
+              />
+              <MenuRow
+                ikon={<IconStruk size={18} />}
+                label="Format Struk & Printer"
+                sublabel="Lebar kertas 58mm, catatan footer"
+                aktif={baseRoute === '#/struk'}
+                onClick={() => handlePindah('#/struk')}
+              />
+            </div>
+          )}
         </div>
 
         {/* ── FOOTER: KELUAR ── */}
