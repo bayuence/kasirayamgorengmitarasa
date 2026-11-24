@@ -24,6 +24,7 @@ import {
 import { statusSinkronSignal, pendingOutboxCountSignal } from './state/sinkron.js';
 import { sessionSignal, inisialisasiSesi, perkayaSesiDariPresensi } from './state/sesi.js';
 import { inisialisasiSinkronisasiOtomatis } from './data/sync.js';
+import { mulaiRealtimeSupabase } from './data/realtime.js';
 
 // ── Tab Konfigurasi Bottom Nav (Hanya Operasional Kasir Utama) ──
 const TABS = [
@@ -53,6 +54,7 @@ export function App() {
 
   useEffect(() => {
     const cleanup = inisialisasiSinkronisasiOtomatis();
+    mulaiRealtimeSupabase();
 
     // Pastikan data profil sesi karyawan selalu diperkaya dengan foto dan divisi terbaru
     if (sessionSignal.value) {

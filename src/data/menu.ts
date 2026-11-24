@@ -394,22 +394,23 @@ export async function sinkronkanMenuDariSupabase(): Promise<void> {
     const db = await getLocalDB();
     const tx = db.transaction(['kategori', 'produk', 'tambahan', 'meta'], 'readwrite');
 
+    // Selalu kosongkan cache lokal agar sinkron persis dengan cloud Supabase
+    await tx.objectStore('kategori').clear();
     if (katData && katData.length > 0) {
-      await tx.objectStore('kategori').clear();
       for (const k of katData) {
         await tx.objectStore('kategori').put(k as KategoriItem);
       }
     }
 
+    await tx.objectStore('produk').clear();
     if (produkData && produkData.length > 0) {
-      await tx.objectStore('produk').clear();
       for (const p of produkData) {
         await tx.objectStore('produk').put(p as ProdukItem);
       }
     }
 
+    await tx.objectStore('tambahan').clear();
     if (tambahanData && tambahanData.length > 0) {
-      await tx.objectStore('tambahan').clear();
       for (const t of tambahanData) {
         await tx.objectStore('tambahan').put(t as TambahanItem);
       }

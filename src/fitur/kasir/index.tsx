@@ -57,26 +57,30 @@ export function LayarKasir({ bukaBayarAwal = false }: LayarKasirProps) {
     muatSemuaOutlet().then(setDaftarOutlet).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    // Muat data lokal dulu agar instan
+  const muatDataKasir = () => {
     muatMenuLokal(outletAktifSignal.value?.id).then(({ produk, tambahan, kategori }) => {
       setProdukList(produk);
       setTambahanList(tambahan);
       setKategoriList(kategori || []);
       setLoading(false);
     });
+  };
 
-    // Otomatis tarik menu terbaru dari cloud (Supabase) jika online
+  useEffect(() => {
+    setLoading(true);
+    muatDataKasir();
+
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       sinkronkanMenuDariSupabase().then(() => {
-        muatMenuLokal(outletAktifSignal.value?.id).then(({ produk, tambahan, kategori }) => {
-          setProdukList(produk);
-          setTambahanList(tambahan);
-          setKategoriList(kategori || []);
-        });
+        muatDataKasir();
       }).catch(() => {});
     }
+
+    const handleUpdate = () => {
+      muatDataKasir();
+    };
+    window.addEventListener('mitarasa:data-updated', handleUpdate);
+    return () => window.removeEventListener('mitarasa:data-updated', handleUpdate);
   }, [outletAktifSignal.value?.id]);
 
   // Timer otomatis membersihkan notifikasi undo setelah 5 detik
