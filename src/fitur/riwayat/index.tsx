@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { getLocalDB, type PesananItem, type ItemPesananDetail } from '../../data/db.js';
 import { getTanggalLokal, formatNomorAntrean, batalkanPesananLokal } from '../../data/outbox.js';
+import { sinkronkanPesananDariSupabase } from '../../data/riwayat-sync.js';
 import { formatRupiah } from '../../util/rupiah.js';
 import { formatTeksStruk, bagikanStruk } from '../../util/struk.js';
 import { sessionSignal } from '../../state/sesi.js';
@@ -46,6 +47,12 @@ export function LayarRiwayat() {
   };
 
   useEffect(() => {
+    // Tarik data terbaru dari Supabase cloud terlebih dahulu jika online
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      sinkronkanPesananDariSupabase(getTanggalLokal()).then(() => {
+        muatRiwayatHariIni();
+      }).catch(() => {});
+    }
     muatRiwayatHariIni();
   }, []);
 

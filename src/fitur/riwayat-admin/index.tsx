@@ -13,6 +13,7 @@ import { formatTeksStruk, bagikanStruk } from '../../util/struk.js';
 import { sessionSignal } from '../../state/sesi.js';
 import { muatSemuaOutlet } from '../../data/outlet.js';
 import { muatPengeluaran } from '../../data/pengeluaran.js';
+import { sinkronkanPesananDariSupabase } from '../../data/riwayat-sync.js';
 import { getSupabase } from '../../data/supabase.js';
 import { pendingOutboxCountSignal } from '../../state/sinkron.js';
 import { prosesOutbox } from '../../data/sync.js';
@@ -158,6 +159,11 @@ export function LayarRiwayatAdmin() {
   };
 
   useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      sinkronkanPesananDariSupabase(tanggalPilih).then(() => {
+        muatDataPesanan();
+      }).catch(() => {});
+    }
     muatDataPesanan();
   }, [tanggalPilih, outletPilih, statusFilter, metodeFilter]);
 

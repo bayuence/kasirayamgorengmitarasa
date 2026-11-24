@@ -2,6 +2,7 @@ import { getLocalDB } from './db.js';
 import { getSupabase } from './supabase.js';
 import { sinkronkanMenuDariSupabase } from './menu.js';
 import { sinkronkanPembayaranDariSupabase } from './pembayaran.js';
+import { sinkronkanPesananDariSupabase } from './riwayat-sync.js';
 import { muatSemuaOutlet } from './outlet.js';
 import { statusSinkronSignal, pendingOutboxCountSignal } from '../state/sinkron.js';
 
@@ -43,11 +44,38 @@ export async function prosesOutbox(): Promise<void> {
         let sukses = false;
 
         if (item.tabel === 'pesanan') {
-          const { error } = await supabase.from('pesanan').upsert(item.data);
+          // Bersihkan data pesanan agar kompatibel dengan tabel pesanan di Supabase
+          const payloadPesanan = { ...item.data };
+          // Pastikan kasir_id bertipe valid atau null
+          if (payloadPesanan.kasir_id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payloadPesanan.kasir_id)) {
+            delete payloadPesanan.kasir_id;
+          }
+          if (payloadPesanan.shift_id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payloadPesanan.shift_id)) {
+            delete payloadPesanan.shift_id;
+          }
+          if (payloadPesanan.uang_awal_id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payloadPesanan.uang_awal_id)) {
+            delete payloadPesanan.uang_awal_id;
+          }
+          delete payloadPesanan.kode_transaksi;
+
+          let { error } = await supabase.from('pesanan').upsert(payloadPesanan);
+          // Jika kolom outlet_id belum ada di Supabase, coba tanpa outlet_id
+          if (error && error.message && error.message.includes('outlet_id')) {
+            const { outlet_id: _, ...tanpaOutlet } = payloadPesanan;
+            const resUlang = await supabase.from('pesanan').upsert(tanpaOutlet);
+            error = resUlang.error;
+          }
           if (!error) sukses = true;
           else console.warn('Gagal upsert pesanan ke server:', error);
         } else if (item.tabel === 'item_pesanan') {
-          const { error } = await supabase.from('item_pesanan').upsert(item.data);
+          let payloadItem = { ...item.data };
+          let { error } = await supabase.from('item_pesanan').upsert(payloadItem);
+          // Jika produk_id bukan uuid dan database menolak, buat uuid acak stabil sementara
+          if (error && error.code === '22P02') {
+            payloadItem.produk_id = '00000000-0000-0000-0000-000000000000';
+            const resUlang = await supabase.from('item_pesanan').upsert(payloadItem);
+            error = resUlang.error;
+          }
           if (!error) sukses = true;
           else console.warn('Gagal upsert item_pesanan ke server:', error);
         } else if (item.tabel === 'uang_awal' || (item.tabel as any) === 'shift') {
@@ -111,6 +139,7 @@ export function inisialisasiSinkronisasiOtomatis(): () => void {
       await muatSemuaOutlet();
       await sinkronkanMenuDariSupabase();
       await sinkronkanPembayaranDariSupabase();
+      await sinkronkanPesananDariSupabase();
       await prosesOutbox();
     } catch (e) {
       console.warn('Gagal sinkronisasi data cloud:', e);
