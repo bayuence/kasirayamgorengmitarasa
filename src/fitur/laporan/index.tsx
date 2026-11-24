@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'preact/hooks';
-import { getLocalDB, type PesananItem, type ItemPesananDetail, type UangAwalItem } from '../../data/db.js';
+import {
+  getLocalDB,
+  type PesananItem,
+  type ItemPesananDetail,
+  type UangAwalItem,
+  type PengeluaranItem,
+} from '../../data/db.js';
 import { getTanggalLokal, formatNomorAntrean } from '../../data/outbox.js';
 import { formatRupiah } from '../../util/rupiah.js';
 import { outletAktifSignal } from '../../data/outlet.js';
+import { muatPengeluaran } from '../../data/pengeluaran.js';
 import {
   formatTanggalPanjang,
   formatTanggalChart,
@@ -11,7 +18,7 @@ import {
   formatBulanTahun,
 } from '../../util/tanggal.js';
 
-// ─── TIPE DATA ────────────────────────────────────────────────────────────────
+// ─── TIPE DATA LAPORAN ────────────────────────────────────────────────────────
 
 interface RingkasanHarian {
   tanggal: string;
@@ -23,9 +30,15 @@ interface RingkasanHarian {
   jumlahItem: number;
   rataRataTransaksi: number;
   transaksiTerbesar: number;
+  totalHpp: number;
+  totalLabaKotor: number;
+  totalPengeluaran: number;
+  labaBersih: number;
+  marginKotorPersen: number;
   uangAwalList: UangAwalItem[];
+  pengeluaranList: PengeluaranItem[];
   totalKasAwal: number;
-  daftarPesanan: { pesanan: PesananItem; items: ItemPesananDetail[] }[];
+  daftarPesanan: { pesanan: PesananItem; items: ItemPesananDetail[]; laba: number; hpp: number }[];
   produkTerlaris: { nama: string; qty: number; total: number }[];
 }
 
@@ -38,11 +51,17 @@ interface RingkasanRentang {
   jumlahItem: number;
   rataRataTransaksi: number;
   transaksiTerbesar: number;
+  totalHpp: number;
+  totalLabaKotor: number;
+  totalPengeluaran: number;
+  labaBersih: number;
+  marginKotorPersen: number;
   totalKasAwal: number;
-  perHari: { tanggal: string; omzet: number; transaksi: number }[];
+  perHari: { tanggal: string; omzet: number; transaksi: number; pengeluaran: number }[];
   produkTerlaris: { nama: string; qty: number; total: number }[];
   uangAwalList: UangAwalItem[];
-  daftarPesanan: { pesanan: PesananItem; items: ItemPesananDetail[] }[];
+  pengeluaranList: PengeluaranItem[];
+  daftarPesanan: { pesanan: PesananItem; items: ItemPesananDetail[]; laba: number; hpp: number }[];
 }
 
 // ─── HELPER ──────────────────────────────────────────────────────────────────
@@ -72,7 +91,7 @@ function tambahHari(tanggal: string, delta: number): string {
 
 function getMingguRange(tanggal: string): { dari: string; sampai: string } {
   const d = new Date(tanggal + 'T00:00:00');
-  const hari = d.getDay(); // 0=minggu
+  const hari = d.getDay();
   const selisihSenin = hari === 0 ? -6 : 1 - hari;
   const senin = new Date(d);
   senin.setDate(d.getDate() + selisihSenin);
@@ -99,10 +118,17 @@ function listTanggal(dari: string, sampai: string): string[] {
   return list;
 }
 
-// ─── FUNGSI MUAT DATA ─────────────────────────────────────────────────────────
+// ─── FUNGSI MUAT DATA LAPORAN ─────────────────────────────────────────────────
 
 async function muatDataHarian(tanggal: string, outletId?: string | null): Promise<RingkasanHarian> {
   const db = await getLocalDB();
+
+  // Mapping HPP Produk
+  const listProduk = await db.getAll('produk');
+  const hppMap = new Map<string, number>();
+  for (const p of listProduk) {
+    hppMap.set(p.id, p.hpp || 0);
+  }
 
   const pesananAll = await db.getAllFromIndex('pesanan', 'by-tanggal', tanggal);
   const pesanan = outletId
@@ -118,13 +144,14 @@ async function muatDataHarian(tanggal: string, outletId?: string | null): Promis
   const transaksiTerbesar = selesai.length ? Math.max(...selesai.map((p) => p.total)) : 0;
   const rataRataTransaksi = selesai.length ? Math.round(totalOmzet / selesai.length) : 0;
 
-  const daftarPesanan: { pesanan: PesananItem; items: ItemPesananDetail[] }[] = [];
+  const daftarPesanan: { pesanan: PesananItem; items: ItemPesananDetail[]; laba: number; hpp: number }[] = [];
   let jumlahItem = 0;
+  let totalHpp = 0;
   const mapProduk: Record<string, { qty: number; total: number }> = {};
 
   for (const p of selesai) {
     const items = await db.getAllFromIndex('item_pesanan', 'by-pesanan', p.id);
-    daftarPesanan.push({ pesanan: p, items });
+    let hppNota = 0;
     for (const it of items) {
       jumlahItem += it.qty;
       const nama = it.nama_produk || 'Unknown';
@@ -132,12 +159,22 @@ async function muatDataHarian(tanggal: string, outletId?: string | null): Promis
       const totalTambahan = it.tambahan.reduce((s, t) => s + t.harga * t.qty, 0);
       mapProduk[nama].qty += it.qty;
       mapProduk[nama].total += (it.harga_satuan + totalTambahan) * it.qty;
+
+      const unitHpp = hppMap.get(it.produk_id) || Math.round(it.harga_satuan * 0.55);
+      hppNota += unitHpp * it.qty;
     }
+    totalHpp += hppNota;
+    daftarPesanan.push({
+      pesanan: p,
+      items,
+      hpp: hppNota,
+      laba: p.total - hppNota,
+    });
   }
 
   for (const p of batal) {
     const items = await db.getAllFromIndex('item_pesanan', 'by-pesanan', p.id);
-    daftarPesanan.push({ pesanan: p, items });
+    daftarPesanan.push({ pesanan: p, items, hpp: 0, laba: 0 });
   }
 
   const produkTerlaris = Object.entries(mapProduk)
@@ -145,6 +182,7 @@ async function muatDataHarian(tanggal: string, outletId?: string | null): Promis
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 10);
 
+  // Muat Uang Awal
   let uangAwalList: UangAwalItem[] = [];
   try {
     const all = await db.getAll('uang_awal');
@@ -153,8 +191,18 @@ async function muatDataHarian(tanggal: string, outletId?: string | null): Promis
       return tgl === tanggal;
     });
   } catch {}
-
   const totalKasAwal = uangAwalList.reduce((s, u) => s + (u.kas_awal || 0), 0);
+
+  // Muat Pengeluaran Operasional
+  let pengeluaranList: PengeluaranItem[] = [];
+  try {
+    pengeluaranList = await muatPengeluaran(tanggal, outletId);
+  } catch {}
+  const totalPengeluaran = pengeluaranList.reduce((s, p) => s + (p.nominal || 0), 0);
+
+  const totalLabaKotor = totalOmzet - totalHpp;
+  const labaBersih = Math.max(0, totalLabaKotor - totalPengeluaran);
+  const marginKotorPersen = totalOmzet > 0 ? Math.round((totalLabaKotor / totalOmzet) * 100) : 0;
 
   daftarPesanan.sort((a, b) => new Date(b.pesanan.waktu).getTime() - new Date(a.pesanan.waktu).getTime());
 
@@ -162,7 +210,8 @@ async function muatDataHarian(tanggal: string, outletId?: string | null): Promis
     tanggal, totalOmzet, totalTunai, totalQris,
     jumlahTransaksi: selesai.length, jumlahBatal: batal.length,
     jumlahItem, rataRataTransaksi, transaksiTerbesar,
-    uangAwalList, totalKasAwal, daftarPesanan, produkTerlaris,
+    totalHpp, totalLabaKotor, totalPengeluaran, labaBersih, marginKotorPersen,
+    uangAwalList, pengeluaranList, totalKasAwal, daftarPesanan, produkTerlaris,
   };
 }
 
@@ -170,12 +219,18 @@ async function muatDataRentang(dari: string, sampai: string, outletId?: string |
   const tanggalList = listTanggal(dari, sampai);
   const db = await getLocalDB();
 
+  const listProduk = await db.getAll('produk');
+  const hppMap = new Map<string, number>();
+  for (const p of listProduk) {
+    hppMap.set(p.id, p.hpp || 0);
+  }
+
   let totalOmzet = 0, totalTunai = 0, totalQris = 0;
   let jumlahTransaksi = 0, jumlahBatal = 0, jumlahItem = 0;
-  let transaksiTerbesar = 0;
-  const perHari: { tanggal: string; omzet: number; transaksi: number }[] = [];
+  let transaksiTerbesar = 0, totalHpp = 0;
+  const perHari: { tanggal: string; omzet: number; transaksi: number; pengeluaran: number }[] = [];
   const mapProduk: Record<string, { qty: number; total: number }> = {};
-  const daftarPesanan: { pesanan: PesananItem; items: ItemPesananDetail[] }[] = [];
+  const daftarPesanan: { pesanan: PesananItem; items: ItemPesananDetail[]; laba: number; hpp: number }[] = [];
   const uangAwalAll: UangAwalItem[] = [];
 
   for (const tgl of tanggalList) {
@@ -197,7 +252,7 @@ async function muatDataRentang(dari: string, sampai: string, outletId?: string |
     for (const p of selesai) {
       if (p.total > transaksiTerbesar) transaksiTerbesar = p.total;
       const items = await db.getAllFromIndex('item_pesanan', 'by-pesanan', p.id);
-      daftarPesanan.push({ pesanan: p, items });
+      let hppNota = 0;
       for (const it of items) {
         jumlahItem += it.qty;
         const nama = it.nama_produk || 'Unknown';
@@ -205,17 +260,23 @@ async function muatDataRentang(dari: string, sampai: string, outletId?: string |
         const totalTambahan = it.tambahan.reduce((s, t) => s + t.harga * t.qty, 0);
         mapProduk[nama].qty += it.qty;
         mapProduk[nama].total += (it.harga_satuan + totalTambahan) * it.qty;
+
+        const unitHpp = hppMap.get(it.produk_id) || Math.round(it.harga_satuan * 0.55);
+        hppNota += unitHpp * it.qty;
       }
+      totalHpp += hppNota;
+      daftarPesanan.push({ pesanan: p, items, hpp: hppNota, laba: p.total - hppNota });
     }
 
     for (const p of batal) {
       const items = await db.getAllFromIndex('item_pesanan', 'by-pesanan', p.id);
-      daftarPesanan.push({ pesanan: p, items });
+      daftarPesanan.push({ pesanan: p, items, hpp: 0, laba: 0 });
     }
 
-    perHari.push({ tanggal: tgl, omzet: omzetHari, transaksi: selesai.length });
+    perHari.push({ tanggal: tgl, omzet: omzetHari, transaksi: selesai.length, pengeluaran: 0 });
   }
 
+  // Uang awal
   try {
     const all = await db.getAll('uang_awal');
     for (const u of all) {
@@ -224,6 +285,21 @@ async function muatDataRentang(dari: string, sampai: string, outletId?: string |
     }
   } catch {}
 
+  // Pengeluaran rentang
+  let pengeluaranAll: PengeluaranItem[] = [];
+  try {
+    const allExp = await db.getAll('pengeluaran');
+    pengeluaranAll = allExp.filter((e) => {
+      const cocokTgl = e.tanggal >= dari && e.tanggal <= sampai;
+      const cocokOutlet = !outletId || !e.outlet_id || e.outlet_id === outletId;
+      return cocokTgl && cocokOutlet;
+    });
+  } catch {}
+
+  const totalPengeluaran = pengeluaranAll.reduce((s, p) => s + (p.nominal || 0), 0);
+  const totalLabaKotor = totalOmzet - totalHpp;
+  const labaBersih = Math.max(0, totalLabaKotor - totalPengeluaran);
+  const marginKotorPersen = totalOmzet > 0 ? Math.round((totalLabaKotor / totalOmzet) * 100) : 0;
   const totalKasAwal = uangAwalAll.reduce((s, u) => s + (u.kas_awal || 0), 0);
 
   const produkTerlaris = Object.entries(mapProduk)
@@ -237,8 +313,9 @@ async function muatDataRentang(dari: string, sampai: string, outletId?: string |
     totalOmzet, totalTunai, totalQris,
     jumlahTransaksi, jumlahBatal, jumlahItem,
     rataRataTransaksi: jumlahTransaksi > 0 ? Math.round(totalOmzet / jumlahTransaksi) : 0,
-    transaksiTerbesar, totalKasAwal, perHari, produkTerlaris,
-    uangAwalList: uangAwalAll, daftarPesanan,
+    transaksiTerbesar, totalHpp, totalLabaKotor, totalPengeluaran, labaBersih, marginKotorPersen,
+    totalKasAwal, perHari, produkTerlaris,
+    uangAwalList: uangAwalAll, pengeluaranList: pengeluaranAll, daftarPesanan,
   };
 }
 
@@ -260,10 +337,10 @@ function DetailTransaksi({
   data,
   onKembali,
 }: {
-  data: { pesanan: PesananItem; items: ItemPesananDetail[] };
+  data: { pesanan: PesananItem; items: ItemPesananDetail[]; laba: number; hpp: number };
   onKembali: () => void;
 }) {
-  const { pesanan, items } = data;
+  const { pesanan, items, laba, hpp } = data;
   const isBatal = pesanan.status === 'batal';
 
   return (
@@ -296,6 +373,19 @@ function DetailTransaksi({
           </span>
         </div>
 
+        {/* Ringkasan Profit Transaksi Ini */}
+        {!isBatal && (
+          <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex justify-between items-center text-xs">
+            <div>
+              <span class="text-[10px] uppercase font-bold text-emerald-800 block">Laba Kotor Transaksi</span>
+              <span class="text-[10px] text-emerald-700">Modal Bahan: {formatRupiah(hpp)}</span>
+            </div>
+            <strong class="text-sm font-black text-emerald-900 tabular-nums">
+              +{formatRupiah(laba)}
+            </strong>
+          </div>
+        )}
+
         <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 rounded-xl p-3">
           <div><p class="text-slate-400 text-[10px]">Waktu</p><p class="font-bold text-slate-900">{formatWaktu(pesanan.waktu)}</p></div>
           <div><p class="text-slate-400 text-[10px]">Metode</p><p class="font-bold text-slate-900 uppercase">{pesanan.metode || '-'}</p></div>
@@ -323,7 +413,6 @@ function DetailTransaksi({
               </div>
             );
           })}
-          {items.length === 0 && <p class="text-xs text-slate-400">Tidak ada item tercatat.</p>}
         </div>
 
         <div class="border-t border-slate-200 pt-3 space-y-1.5 text-xs">
@@ -351,10 +440,10 @@ function DetailTransaksi({
   );
 }
 
-// ─── KOMPONEN UTAMA ───────────────────────────────────────────────────────────
+// ─── KOMPONEN UTAMA LAYAR LAPORAN ─────────────────────────────────────────────
 
 type ModeView = 'harian' | 'mingguan' | 'bulanan' | 'custom';
-type TabAktif = 'ringkasan' | 'transaksi' | 'produk' | 'kasir';
+type TabAktif = 'ringkasan' | 'transaksi' | 'pengeluaran' | 'produk' | 'kasir';
 
 export function LayarLaporan() {
   const [modeView, setModeView] = useState<ModeView>('harian');
@@ -366,7 +455,7 @@ export function LayarLaporan() {
   const [laporanRentang, setLaporanRentang] = useState<RingkasanRentang | null>(null);
   const [loading, setLoading] = useState(true);
   const [tabAktif, setTabAktif] = useState<TabAktif>('ringkasan');
-  const [detailPesanan, setDetailPesanan] = useState<{ pesanan: PesananItem; items: ItemPesananDetail[] } | null>(null);
+  const [detailPesanan, setDetailPesanan] = useState<{ pesanan: PesananItem; items: ItemPesananDetail[]; laba: number; hpp: number } | null>(null);
 
   const outletId = outletAktifSignal.value?.id;
   const namaOutlet = outletAktifSignal.value?.nama || 'Semua Cabang';
@@ -416,11 +505,11 @@ export function LayarLaporan() {
   const isHariIni = tanggal === getTanggalLokal();
   const { dari, sampai } = getDariSampai();
 
-  // Data aktif (harian atau rentang)
   const aktif = laporanHarian || laporanRentang;
   const daftarPesananAktif = laporanHarian?.daftarPesanan || laporanRentang?.daftarPesanan || [];
   const produkTerlarisAktif = laporanHarian?.produkTerlaris || laporanRentang?.produkTerlaris || [];
   const uangAwalAktif = laporanHarian?.uangAwalList || laporanRentang?.uangAwalList || [];
+  const pengeluaranAktif = laporanHarian?.pengeluaranList || laporanRentang?.pengeluaranList || [];
 
   const labelPeriode = () => {
     if (modeView === 'harian') return formatTanggalPanjang(tanggal);
@@ -432,6 +521,7 @@ export function LayarLaporan() {
   const TABS: { id: TabAktif; label: string }[] = [
     { id: 'ringkasan', label: 'Ringkasan' },
     { id: 'transaksi', label: 'Transaksi' },
+    { id: 'pengeluaran', label: 'Biaya' },
     { id: 'produk', label: 'Menu Terlaris' },
     { id: 'kasir', label: 'Sesi Kasir' },
   ];
@@ -446,16 +536,20 @@ export function LayarLaporan() {
   return (
     <div class="min-h-screen bg-slate-50 pb-28">
       {/* ── HEADER STICKY ── */}
-      <div class="bg-white border-b border-slate-200 sticky top-0 z-20">
+      <div class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-2xs">
         <div class="max-w-3xl mx-auto px-4 pt-3 pb-0">
 
           {/* Judul + Outlet */}
           <div class="flex items-center justify-between gap-3 mb-3">
             <div>
-              <h1 class="text-base font-black text-slate-900 tracking-tight leading-tight">Laporan Penjualan</h1>
-              <p class="text-[11px] text-slate-500 leading-tight truncate max-w-[200px]">{namaOutlet}</p>
+              <span class="text-[10px] font-black text-slate-800 bg-slate-100 px-2 py-0.5 rounded uppercase">
+                Operasional Laporan
+              </span>
+              <h1 class="text-base font-black text-slate-900 tracking-tight leading-tight mt-0.5">
+                Laporan Keuangan & Penjualan
+              </h1>
+              <p class="text-[11px] text-slate-500 truncate max-w-[220px]">{namaOutlet}</p>
             </div>
-            {/* Tombol kembali hari ini */}
             {modeView !== 'custom' && !isHariIni && (
               <button
                 type="button"
@@ -473,7 +567,7 @@ export function LayarLaporan() {
               <button
                 key={m.id}
                 type="button"
-                onClick={() => { setModeView(m.id); }}
+                onClick={() => setModeView(m.id)}
                 class={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
                   modeView === m.id
                     ? 'bg-white text-slate-900 shadow-2xs'
@@ -528,7 +622,6 @@ export function LayarLaporan() {
               </button>
             </div>
           ) : (
-            /* Custom Range Picker */
             <div class="flex items-center gap-2 mb-2">
               <div class="flex-1">
                 <label class="text-[10px] font-bold text-slate-500 block mb-0.5">Dari</label>
@@ -555,24 +648,10 @@ export function LayarLaporan() {
             </div>
           )}
 
-          {/* Label Tanggal (untuk harian) */}
-          {modeView === 'harian' && (
-            <div class="flex items-center justify-center gap-2 mb-3 text-[11px] font-bold text-slate-500">
-              <span>{formatTanggalIndo(tanggal)}</span>
-              {isHariIni && (
-                <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-extrabold">
-                  HARI INI
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Label Periode (untuk non-harian) */}
-          {modeView !== 'harian' && (
-            <div class="flex items-center justify-center mb-3 text-[11px] font-bold text-slate-500">
-              <span>{labelPeriode()}</span>
-            </div>
-          )}
+          {/* Label Tanggal */}
+          <div class="flex items-center justify-center mb-3 text-[11px] font-bold text-slate-500">
+            <span>{labelPeriode()}</span>
+          </div>
 
           {/* Tab Navigasi */}
           <div class="flex border-t border-slate-100 -mx-4 px-0">
@@ -594,112 +673,103 @@ export function LayarLaporan() {
         </div>
       </div>
 
-      {/* ── KONTEN ── */}
+      {/* ── KONTEN LAPORAN ── */}
       <div class="max-w-3xl mx-auto px-4 py-5">
-
         {loading ? (
           <div class="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
             <div class="w-6 h-6 border-2 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
             <span class="text-xs font-medium">Memuat data laporan...</span>
           </div>
-
         ) : !aktif ? (
           <div class="text-center py-20 text-slate-400 text-xs">Gagal memuat laporan</div>
-
         ) : detailPesanan ? (
           <DetailTransaksi data={detailPesanan} onKembali={() => setDetailPesanan(null)} />
-
         ) : tabAktif === 'ringkasan' ? (
-          /* ── TAB RINGKASAN ── */
+          /* ── TAB RINGKASAN: PEMISAHAN OMZET, HPP, LABA KOTOR, BIAYA, LABA BERSIH ── */
           <div class="space-y-4">
-            {/* Kartu Hero Omzet */}
-            <div class="bg-slate-900 text-white rounded-2xl p-5 shadow-md">
-              <p class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total Omzet</p>
-              <p class="text-3xl font-black tracking-tight mt-1">{formatRupiah(aktif.totalOmzet)}</p>
-              <div class="flex items-center gap-4 mt-3 text-[11px] text-slate-400">
-                <span>{aktif.jumlahTransaksi} transaksi lunas</span>
-                {aktif.jumlahBatal > 0 && <span class="text-rose-400">{aktif.jumlahBatal} dibatalkan</span>}
+            {/* 1. PEMISAHAN JELAS OMZET vs LABA BERSIH */}
+            <div class="grid grid-cols-2 gap-3">
+              {/* Card Omzet */}
+              <div class="bg-slate-900 text-white rounded-2xl p-4 shadow-md">
+                <span class="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  1. Total Omzet Penjualan
+                </span>
+                <span class="text-xl sm:text-2xl font-black block mt-1 tabular-nums">
+                  {formatRupiah(aktif.totalOmzet)}
+                </span>
+                <p class="text-[10px] text-slate-400 mt-1">
+                  {aktif.jumlahTransaksi} transaksi lunas
+                </p>
+              </div>
+
+              {/* Card Laba Bersih */}
+              <div class="bg-emerald-600 text-white rounded-2xl p-4 shadow-md">
+                <span class="text-[10px] font-black uppercase tracking-wider text-emerald-200 block">
+                  2. Keuntungan Laba Bersih
+                </span>
+                <span class="text-xl sm:text-2xl font-black block mt-1 tabular-nums">
+                  +{formatRupiah(aktif.labaBersih)}
+                </span>
+                <p class="text-[10px] text-emerald-100 mt-1">
+                  Hasil murni setelah potong biaya
+                </p>
               </div>
             </div>
 
-            {/* Grid Statistik */}
+            {/* Rekapitulasi Rinci Finansial (HPP, Laba Kotor, Biaya Pengeluaran) */}
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
+              <h3 class="text-xs font-black uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-2">
+                Bedah Arus Kas & Keuntungan Bersih
+              </h3>
+
+              <div class="space-y-2 text-xs">
+                <div class="flex justify-between items-center p-2 rounded-xl bg-slate-50">
+                  <span class="font-bold text-slate-600">Total Omzet Penjualan (Kotor)</span>
+                  <strong class="font-black text-slate-900 tabular-nums">{formatRupiah(aktif.totalOmzet)}</strong>
+                </div>
+
+                <div class="flex justify-between items-center p-2 rounded-xl bg-amber-50/70 border border-amber-200/70">
+                  <span class="font-bold text-amber-900">Modal Pokok Menu (HPP Bahan Baku)</span>
+                  <strong class="font-black text-amber-950 tabular-nums">-{formatRupiah(aktif.totalHpp)}</strong>
+                </div>
+
+                <div class="flex justify-between items-center p-2 rounded-xl bg-blue-50/80 border border-blue-200/80">
+                  <span class="font-bold text-blue-900">
+                    Laba Kotor Toko ({aktif.marginKotorPersen}% Margin)
+                  </span>
+                  <strong class="font-black text-blue-950 tabular-nums">+{formatRupiah(aktif.totalLabaKotor)}</strong>
+                </div>
+
+                <div class="flex justify-between items-center p-2 rounded-xl bg-rose-50/80 border border-rose-200/80">
+                  <span class="font-bold text-rose-900">
+                    Biaya Pengeluaran Operasional ({pengeluaranAktif.length} catatan)
+                  </span>
+                  <strong class="font-black text-rose-950 tabular-nums">-{formatRupiah(aktif.totalPengeluaran)}</strong>
+                </div>
+
+                <div class="flex justify-between items-center p-3 rounded-xl bg-emerald-50 border border-emerald-300">
+                  <div>
+                    <span class="font-black text-emerald-950 block text-xs">Laba Bersih Akhir Toko</span>
+                    <span class="text-[10px] text-emerald-700">Laba Kotor dikurangi Semua Biaya Pengeluaran</span>
+                  </div>
+                  <strong class="text-base font-black text-emerald-950 tabular-nums font-mono">
+                    +{formatRupiah(aktif.labaBersih)}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Grid Statistik 6 Metrik */}
             <div class="grid grid-cols-2 gap-3">
-              <KartuStat label="Tunai" nilai={formatRupiah(aktif.totalTunai)}
+              <KartuStat label="Tunai Diterima" nilai={formatRupiah(aktif.totalTunai)}
                 sub={aktif.totalOmzet > 0 ? `${Math.round((aktif.totalTunai / aktif.totalOmzet) * 100)}% dari omzet` : '—'} />
-              <KartuStat label="QRIS" nilai={formatRupiah(aktif.totalQris)} warna="text-blue-700"
+              <KartuStat label="QRIS Diterima" nilai={formatRupiah(aktif.totalQris)} warna="text-indigo-700"
                 sub={aktif.totalOmzet > 0 ? `${Math.round((aktif.totalQris / aktif.totalOmzet) * 100)}% dari omzet` : '—'} />
               <KartuStat label="Rata-rata / Nota" nilai={formatRupiah(aktif.rataRataTransaksi)} sub="per transaksi" />
               <KartuStat label="Transaksi Terbesar" nilai={formatRupiah(aktif.transaksiTerbesar)} warna="text-emerald-700" sub="1 nota tertinggi" />
               <KartuStat label="Total Item Terjual" nilai={String(aktif.jumlahItem)} sub="porsi / unit" />
               <KartuStat label="Total Kas Awal" nilai={formatRupiah(aktif.totalKasAwal)} sub={`${uangAwalAktif.length} sesi kasir`} />
             </div>
-
-            {/* Grafik Bar Harian (hanya untuk mode mingguan/bulanan/custom) */}
-            {laporanRentang && laporanRentang.perHari.length > 1 && (
-              <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-                <h3 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 mb-3">
-                  Omzet per Hari
-                </h3>
-                <div class="space-y-1.5">
-                  {(() => {
-                    const maxOmzet = Math.max(...laporanRentang.perHari.map((h) => h.omzet), 1);
-                    return laporanRentang.perHari.map((h) => {
-                      const persen = (h.omzet / maxOmzet) * 100;
-                      return (
-                        <div key={h.tanggal} class="flex items-center gap-2">
-                          <span class="text-[10px] font-bold text-slate-500 w-14 shrink-0 text-right">
-                            {formatTanggalPendek(h.tanggal)}
-                          </span>
-                          <div class="flex-1 h-6 bg-slate-100 rounded-lg overflow-hidden relative">
-                            <div
-                              class="h-full bg-slate-800 rounded-lg transition-all duration-500"
-                              style={{ width: `${persen}%` }}
-                            />
-                            {h.omzet > 0 && (
-                              <span class="absolute inset-0 flex items-center px-2 text-[10px] font-bold text-white">
-                                {formatRupiah(h.omzet)}
-                              </span>
-                            )}
-                          </div>
-                          <span class="text-[10px] font-bold text-slate-500 w-5 shrink-0 text-left">
-                            {h.transaksi}
-                          </span>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-                <p class="text-[10px] text-slate-400 mt-2 text-right">angka kanan = jumlah transaksi</p>
-              </div>
-            )}
-
-            {/* Breakdown Metode Pembayaran */}
-            {aktif.jumlahTransaksi > 0 && (
-              <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-                <h3 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 mb-3">
-                  Komposisi Metode Pembayaran
-                </h3>
-                <div class="space-y-2.5">
-                  {[
-                    { label: 'Tunai', nilai: aktif.totalTunai, warna: 'bg-slate-800' },
-                    { label: 'QRIS', nilai: aktif.totalQris, warna: 'bg-blue-500' },
-                  ].map((m) => {
-                    const persen = aktif.totalOmzet > 0 ? (m.nilai / aktif.totalOmzet) * 100 : 0;
-                    return (
-                      <div key={m.label}>
-                        <div class="flex justify-between text-xs mb-1">
-                          <span class="font-bold text-slate-700">{m.label}</span>
-                          <span class="font-bold text-slate-900 tabular-nums">{formatRupiah(m.nilai)} ({persen.toFixed(0)}%)</span>
-                        </div>
-                        <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div class={`h-full ${m.warna} rounded-full transition-all duration-500`} style={{ width: `${persen}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Top 3 Menu Terlaris */}
             {produkTerlarisAktif.length > 0 && (
@@ -726,23 +796,10 @@ export function LayarLaporan() {
                 </div>
               </div>
             )}
-
-            {aktif.jumlahTransaksi === 0 && (
-              <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center shadow-2xs">
-                <div class="w-12 h-12 mx-auto mb-3 rounded-2xl bg-slate-100 flex items-center justify-center">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
-                  </svg>
-                </div>
-                <h4 class="text-sm font-bold text-slate-700">Belum Ada Transaksi</h4>
-                <p class="text-xs text-slate-500 mt-1">Tidak ada transaksi tercatat pada periode ini.</p>
-              </div>
-            )}
           </div>
 
         ) : tabAktif === 'transaksi' ? (
-          /* ── TAB DAFTAR TRANSAKSI ── */
+          /* ── TAB TRANSAKSI ── */
           <div class="space-y-2.5">
             <div class="flex items-center justify-between mb-1">
               <span class="text-xs font-extrabold uppercase tracking-wider text-slate-500">
@@ -758,13 +815,14 @@ export function LayarLaporan() {
               <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-400 text-xs">
                 Tidak ada transaksi pada periode ini.
               </div>
-            ) : daftarPesananAktif.map(({ pesanan, items }) => {
+            ) : daftarPesananAktif.map((item) => {
+              const { pesanan, items, laba } = item;
               const totalItem = items.reduce((s, it) => s + it.qty, 0);
               const isBatal = pesanan.status === 'batal';
               return (
                 <div
                   key={pesanan.id}
-                  onClick={() => setDetailPesanan({ pesanan, items })}
+                  onClick={() => setDetailPesanan(item)}
                   class={`bg-white rounded-2xl border p-3.5 shadow-2xs cursor-pointer hover:border-slate-400 transition-all ${
                     isBatal ? 'border-rose-200/70 opacity-75' : 'border-slate-200'
                   }`}
@@ -777,34 +835,72 @@ export function LayarLaporan() {
                         </span>
                         <span class={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
                           isBatal ? 'bg-rose-100 text-rose-700' :
-                          pesanan.metode === 'qris' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                          pesanan.metode === 'qris' ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800'
                         }`}>
                           {isBatal ? 'BATAL' : (pesanan.metode || '-').toUpperCase()}
                         </span>
-                        {/* Tanggal (untuk mode non-harian) */}
-                        {modeView !== 'harian' && (
-                          <span class="text-[10px] text-slate-400 font-mono">
-                            {pesanan.tanggal || pesanan.waktu?.slice(0, 10)}
+                        {!isBatal && (
+                          <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                            Laba: +{formatRupiah(laba)}
                           </span>
                         )}
                       </div>
                       <p class="text-[11px] text-slate-500 mt-0.5 truncate">
                         {totalItem} item · {formatWaktu(pesanan.waktu)}
-                        {pesanan.catatan && ` · "${pesanan.catatan}"`}
                       </p>
                     </div>
                     <div class="text-right shrink-0">
                       <span class={`text-sm font-black tabular-nums ${isBatal ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                         {formatRupiah(pesanan.total)}
                       </span>
-                      <svg class="ml-auto mt-0.5" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
                     </div>
                   </div>
                 </div>
               );
             })}
+          </div>
+
+        ) : tabAktif === 'pengeluaran' ? (
+          /* ── TAB PENGELUARAN BIAYA TOKO ── */
+          <div class="space-y-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                Rincian Biaya Pengeluaran Toko
+              </span>
+              <span class="text-xs font-black text-rose-700">
+                Total: -{formatRupiah(aktif.totalPengeluaran)}
+              </span>
+            </div>
+
+            {pengeluaranAktif.length === 0 ? (
+              <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-400 text-xs">
+                Tidak ada catatan biaya pengeluaran pada periode ini.
+              </div>
+            ) : (
+              <div class="space-y-2">
+                {pengeluaranAktif.map((p) => (
+                  <div key={p.id} class="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-2xs flex items-center justify-between gap-3">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-black px-2 py-0.5 rounded bg-rose-100 text-rose-800">
+                          {p.kategori}
+                        </span>
+                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 uppercase">
+                          {p.metode}
+                        </span>
+                      </div>
+                      <h4 class="text-xs font-bold text-slate-900 mt-1">{p.keterangan}</h4>
+                      <p class="text-[10px] text-slate-400 mt-0.5">
+                        {formatTanggalPanjang(p.tanggal)} · {formatWaktu(p.waktu)}
+                      </p>
+                    </div>
+                    <strong class="text-sm font-black text-rose-700 tabular-nums shrink-0">
+                      -{formatRupiah(p.nominal)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
         ) : tabAktif === 'produk' ? (
@@ -850,7 +946,7 @@ export function LayarLaporan() {
           </div>
 
         ) : (
-          /* ── TAB SESI KASIR / UANG AWAL ── */
+          /* ── TAB SESI KASIR ── */
           <div class="space-y-4">
             <div class="flex items-center justify-between mb-1">
               <span class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Sesi Kasir & Uang Awal</span>
@@ -862,139 +958,37 @@ export function LayarLaporan() {
                 Belum ada data uang awal untuk periode ini.
               </div>
             ) : (
-              uangAwalAktif.map((u, i) => {
-                const selisih = u.selisih || 0;
-                return (
-                  <div key={u.id} class="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
-                    <div class="flex items-start justify-between">
-                      <div>
-                        <h4 class="text-sm font-black text-slate-900">
-                          Sesi #{i + 1}{u.kasir_nama ? ` — ${u.kasir_nama}` : ''}
-                        </h4>
-                        <p class="text-[11px] text-slate-500">
-                          {u.tanggal && <span class="font-mono mr-2">{u.tanggal}</span>}
-                          Buka: {formatWaktuLengkap(u.buka_pada)}
-                          {u.tutup_pada ? ` · Tutup: ${formatWaktuLengkap(u.tutup_pada)}` : ' · Masih Berjalan'}
-                        </p>
-                        {u.sumber_dana && (
-                          <p class="text-[10px] text-amber-700 mt-0.5">Sumber: {u.sumber_dana}</p>
-                        )}
-                      </div>
-                      <span class={`text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
-                        u.tutup_pada ? 'bg-slate-100 text-slate-700' : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {u.tutup_pada ? 'Tutup' : 'Aktif'}
-                      </span>
+              uangAwalAktif.map((u, i) => (
+                <div key={u.id} class="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
+                  <div class="flex items-start justify-between">
+                    <div>
+                      <h4 class="text-sm font-black text-slate-900">
+                        Sesi #{i + 1}{u.kasir_nama ? ` — ${u.kasir_nama}` : ''}
+                      </h4>
+                      <p class="text-[11px] text-slate-500">
+                        Buka: {formatWaktuLengkap(u.buka_pada)}
+                        {u.tutup_pada ? ` · Tutup: ${formatWaktuLengkap(u.tutup_pada)}` : ' · Masih Berjalan'}
+                      </p>
                     </div>
+                    <span class={`text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
+                      u.tutup_pada ? 'bg-slate-100 text-slate-700' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {u.tutup_pada ? 'Tutup' : 'Aktif'}
+                    </span>
+                  </div>
 
-                    <div class="grid grid-cols-2 gap-2 text-xs">
-                      <div class="bg-amber-50 rounded-xl p-2.5">
-                        <p class="text-[10px] font-bold text-slate-500 uppercase">Kas Awal</p>
-                        <p class="font-black text-amber-900 mt-0.5 tabular-nums">{formatRupiah(u.kas_awal)}</p>
-                      </div>
-                      {u.kas_akhir != null && (
-                        <div class="bg-slate-50 rounded-xl p-2.5">
-                          <p class="text-[10px] font-bold text-slate-500 uppercase">Kas Akhir (Fisik)</p>
-                          <p class="font-black text-slate-900 mt-0.5 tabular-nums">{formatRupiah(u.kas_akhir)}</p>
-                        </div>
-                      )}
-                      <div class="bg-emerald-50 rounded-xl p-2.5">
-                        <p class="text-[10px] font-bold text-slate-500 uppercase">Tunai Masuk</p>
-                        <p class="font-black text-emerald-800 mt-0.5 tabular-nums">{formatRupiah(u.total_tunai || 0)}</p>
-                      </div>
-                      <div class="bg-blue-50 rounded-xl p-2.5">
-                        <p class="text-[10px] font-bold text-slate-500 uppercase">QRIS Masuk</p>
-                        <p class="font-black text-blue-800 mt-0.5 tabular-nums">{formatRupiah(u.total_qris || 0)}</p>
-                      </div>
-                      <div class="bg-slate-50 rounded-xl p-2.5">
-                        <p class="text-[10px] font-bold text-slate-500 uppercase">Total Omzet Sesi</p>
-                        <p class="font-black text-slate-900 mt-0.5 tabular-nums">{formatRupiah((u.total_tunai || 0) + (u.total_qris || 0))}</p>
-                      </div>
-                      {u.jumlah_pesanan != null && (
-                        <div class="bg-slate-50 rounded-xl p-2.5">
-                          <p class="text-[10px] font-bold text-slate-500 uppercase">Jml Transaksi</p>
-                          <p class="font-black text-slate-900 mt-0.5">{u.jumlah_pesanan} nota</p>
-                        </div>
-                      )}
-                      {u.tutup_pada && (
-                        <div class={`rounded-xl p-2.5 col-span-2 ${
-                          selisih < 0 ? 'bg-rose-50' : selisih > 0 ? 'bg-amber-50' : 'bg-emerald-50'
-                        }`}>
-                          <p class="text-[10px] font-bold text-slate-500 uppercase">Selisih Kas</p>
-                          <div class="flex items-center justify-between mt-0.5">
-                            <p class={`font-black tabular-nums text-sm ${
-                              selisih < 0 ? 'text-rose-700' : selisih > 0 ? 'text-amber-700' : 'text-emerald-700'
-                            }`}>
-                              {selisih > 0 ? '+' : ''}{formatRupiah(selisih)}
-                            </p>
-                            <span class={`text-[10px] font-bold ${
-                              selisih === 0 ? 'text-emerald-700' : selisih > 0 ? 'text-amber-700' : 'text-rose-700'
-                            }`}>
-                              {selisih === 0 ? 'Pas / Sesuai' : selisih > 0 ? 'Lebih' : 'Kurang'}
-                            </span>
-                          </div>
-                          <p class="text-[10px] text-slate-400 mt-0.5">
-                            Estimasi laci: {formatRupiah(u.kas_awal + (u.total_tunai || 0))} · Fisik dihitung: {formatRupiah(u.kas_akhir || 0)}
-                          </p>
-                        </div>
-                      )}
+                  <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="bg-amber-50 rounded-xl p-2.5">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">Kas Awal</p>
+                      <p class="font-black text-amber-900 mt-0.5 tabular-nums">{formatRupiah(u.kas_awal)}</p>
                     </div>
-
-                    {/* Rincian Pecahan */}
-                    {u.rincian_pecahan && Object.values(u.rincian_pecahan).some((v) => v > 0) && (
-                      <div class="bg-amber-50/70 border border-amber-200/60 rounded-xl px-3 py-2 text-[11px] text-amber-950">
-                        <span class="font-bold block mb-1">Rincian Lembaran Uang Awal:</span>
-                        <div class="flex flex-wrap gap-1.5">
-                          {Object.entries(u.rincian_pecahan)
-                            .filter(([_, qty]) => qty > 0)
-                            .map(([nom, qty]) => (
-                              <span key={nom} class="px-2 py-0.5 bg-white border border-amber-200 rounded-md text-[10px] font-semibold font-mono">
-                                {qty}x {formatRupiah(Number(nom))}
-                              </span>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {u.catatan && (
-                      <div class="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-[11px] text-amber-800">
-                        <strong>Catatan:</strong> {u.catatan}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-
-            {/* Rekap total */}
-            {uangAwalAktif.length > 0 && (
-              <div class="bg-slate-900 rounded-2xl p-4 text-white shadow-md mt-2">
-                <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Rekap Total Semua Sesi</h4>
-                <div class="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <p class="text-slate-400 text-[10px]">Total Kas Awal</p>
-                    <p class="font-black text-amber-300 mt-0.5 tabular-nums">{formatRupiah(aktif.totalKasAwal)}</p>
-                  </div>
-                  <div>
-                    <p class="text-slate-400 text-[10px]">Total Omzet</p>
-                    <p class="font-black text-emerald-400 mt-0.5 tabular-nums">{formatRupiah(aktif.totalOmzet)}</p>
-                  </div>
-                  <div>
-                    <p class="text-slate-400 text-[10px]">Total Tunai</p>
-                    <p class="font-black text-white mt-0.5 tabular-nums">{formatRupiah(aktif.totalTunai)}</p>
-                  </div>
-                  <div>
-                    <p class="text-slate-400 text-[10px]">Total QRIS</p>
-                    <p class="font-black text-blue-300 mt-0.5 tabular-nums">{formatRupiah(aktif.totalQris)}</p>
-                  </div>
-                  <div class="col-span-2 pt-2 border-t border-slate-700">
-                    <p class="text-slate-400 text-[10px]">Uang Fisik Laci Estimasi (Kas Awal + Tunai)</p>
-                    <p class="font-black text-white mt-0.5 tabular-nums text-sm">
-                      {formatRupiah(aktif.totalKasAwal + aktif.totalTunai)}
-                    </p>
+                    <div class="bg-emerald-50 rounded-xl p-2.5">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">Tunai Masuk</p>
+                      <p class="font-black text-emerald-800 mt-0.5 tabular-nums">{formatRupiah(u.total_tunai || 0)}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ))
             )}
           </div>
         )}
