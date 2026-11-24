@@ -1,30 +1,42 @@
 import { useState, useEffect } from 'preact/hooks';
-import { getLocalDB, type PesananItem, type ItemPesananDetail, type OutletItem } from '../../data/db.js';
+import {
+  getLocalDB,
+  type PesananItem,
+  type ItemPesananDetail,
+  type OutletItem,
+  type ProdukItem,
+  type OutboxItem,
+} from '../../data/db.js';
 import { getTanggalLokal, formatNomorAntrean, batalkanPesananLokal } from '../../data/outbox.js';
 import { formatRupiah } from '../../util/rupiah.js';
 import { formatTeksStruk, bagikanStruk } from '../../util/struk.js';
 import { sessionSignal } from '../../state/sesi.js';
-import { muatSemuaOutlet, outletAktifSignal } from '../../data/outlet.js';
+import { muatSemuaOutlet } from '../../data/outlet.js';
+import { getSupabase } from '../../data/supabase.js';
+import { pendingOutboxCountSignal } from '../../state/sinkron.js';
+import { prosesOutbox } from '../../data/sync.js';
 import {
   formatTanggalPanjang,
-  formatTanggalAngka,
   formatWaktu,
   formatTanggalWaktu,
-  formatStrukWaktu,
 } from '../../util/tanggal.js';
 import {
   IconCari,
-  IconToko,
   IconCheck,
   IconTutup,
   IconPrinter,
   IconShare,
+  IconPlus,
+  IconMinus,
 } from '../../komponen/Icon.js';
 
 interface PesananDenganItem {
   pesanan: PesananItem;
   items: ItemPesananDetail[];
   nomorAntrean: string;
+  totalHpp: number;
+  totalLaba: number;
+  marginPersen: number;
 }
 
 export function LayarRiwayatAdmin() {
@@ -36,16 +48,40 @@ export function LayarRiwayatAdmin() {
   const [cari, setCari] = useState('');
   const [loading, setLoading] = useState(true);
   const [daftarOutlet, setDaftarOutlet] = useState<OutletItem[]>([]);
+  const [mapHppProduk, setMapHppProduk] = useState<Map<string, number>>(new Map());
 
+  // Modal Detail & Edit
   const [pesananDipilih, setPesananDipilih] = useState<PesananDenganItem | null>(null);
-  const [modalBatal, setModalBatal] = useState(false);
-  const [alasanBatal, setAlasanBatal] = useState('');
-  const [errorBatal, setErrorBatal] = useState('');
-  const [notifSalin, setNotifSalin] = useState('');
+  const [modeEdit, setModeEdit] = useState(false);
+  const [editMetode, setEditMetode] = useState<'tunai' | 'qris'>('tunai');
+  const [editStatus, setEditStatus] = useState<'selesai' | 'batal'>('selesai');
+  const [editBayar, setEditBayar] = useState<number>(0);
+  const [editCatatan, setEditCatatan] = useState<string>('');
+  const [editAlasanBatal, setEditAlasanBatal] = useState<string>('');
+  const [editItems, setEditItems] = useState<ItemPesananDetail[]>([]);
+  const [pesanNotif, setPesanNotif] = useState('');
 
-  // Muat daftar outlet untuk filter admin
+  // Modal Batal Cepat
+  const [modalBatal, setModalBatal] = useState(false);
+  const [alasanBatalCepat, setAlasanBatalCepat] = useState('');
+  const [errorBatal, setErrorBatal] = useState('');
+
+  const notifikasi = (teks: string) => {
+    setPesanNotif(teks);
+    setTimeout(() => setPesanNotif(''), 3500);
+  };
+
+  // Muat outlet dan daftar produk untuk mapping HPP
   useEffect(() => {
     muatSemuaOutlet().then(setDaftarOutlet).catch(() => {});
+    getLocalDB().then(async (db) => {
+      const listProduk = await db.getAll('produk');
+      const map = new Map<string, number>();
+      for (const p of listProduk) {
+        map.set(p.id, p.hpp || 0);
+      }
+      setMapHppProduk(map);
+    });
   }, []);
 
   const muatDataPesanan = async () => {
@@ -59,31 +95,47 @@ export function LayarRiwayatAdmin() {
       pesananData = await db.getAll('pesanan');
     }
 
-    // Filter berdasarkan Outlet (jika dipilih)
     if (outletPilih !== 'semua') {
       pesananData = pesananData.filter((p) => p.outlet_id === outletPilih);
     }
 
-    // Filter status
     if (statusFilter !== 'semua') {
       pesananData = pesananData.filter((p) => p.status === statusFilter);
     }
 
-    // Filter metode
     if (metodeFilter !== 'semua') {
       pesananData = pesananData.filter((p) => p.metode === metodeFilter);
     }
 
-    // Urutkan terbaru lebih dulu
     pesananData.sort((a, b) => new Date(b.waktu).getTime() - new Date(a.waktu).getTime());
+
+    // Ambil produk untuk referensi HPP terbaru jika map kosong
+    const listProduk = await db.getAll('produk');
+    const hppMap = new Map<string, number>();
+    for (const p of listProduk) {
+      hppMap.set(p.id, p.hpp || 0);
+    }
 
     const hasil: PesananDenganItem[] = [];
     for (const p of pesananData) {
       const items = await db.getAllFromIndex('item_pesanan', 'by-pesanan', p.id);
+
+      // Hitung HPP dan Laba Kotor
+      let totalHpp = 0;
+      for (const it of items) {
+        const hppPerUnit = hppMap.get(it.produk_id) || Math.round(it.harga_satuan * 0.55);
+        totalHpp += hppPerUnit * it.qty;
+      }
+      const totalLaba = p.total - totalHpp;
+      const marginPersen = p.total > 0 ? Math.round((totalLaba / p.total) * 100) : 0;
+
       hasil.push({
         pesanan: p,
         items,
         nomorAntrean: formatNomorAntrean(p.kode_perangkat, p.nomor),
+        totalHpp,
+        totalLaba,
+        marginPersen,
       });
     }
 
@@ -95,21 +147,130 @@ export function LayarRiwayatAdmin() {
     muatDataPesanan();
   }, [tanggalPilih, outletPilih, statusFilter, metodeFilter]);
 
-  const handleBatalkan = async (e: Event) => {
+  // Siapkan data saat membuka detail pesanan
+  const bukaDetail = (item: PesananDenganItem) => {
+    setPesananDipilih(item);
+    setModeEdit(false);
+    setEditMetode(item.pesanan.metode);
+    setEditStatus(item.pesanan.status);
+    setEditBayar(item.pesanan.bayar);
+    setEditCatatan(item.pesanan.catatan || '');
+    setEditAlasanBatal(item.pesanan.alasan_batal || '');
+    setEditItems(JSON.parse(JSON.stringify(item.items)));
+  };
+
+  // Hitung ulang total di mode edit
+  const hitungTotalEdit = () => {
+    let t = 0;
+    for (const it of editItems) {
+      const totTambahan = it.tambahan.reduce((s, x) => s + x.harga * x.qty, 0);
+      t += (it.harga_satuan + totTambahan) * it.qty;
+    }
+    return t;
+  };
+
+  const ubahQtyEditItem = (idx: number, delta: number) => {
+    const list = [...editItems];
+    const item = list[idx];
+    const baru = item.qty + delta;
+    if (baru <= 0) {
+      if (list.length === 1) {
+        alert('Minimal harus ada 1 item pesanan. Jika ingin membatalkan transaksi, ubah status menjadi Batal.');
+        return;
+      }
+      list.splice(idx, 1);
+    } else {
+      list[idx] = { ...item, qty: baru };
+    }
+    setEditItems(list);
+  };
+
+  // Simpan Perubahan oleh Admin (IndexedDB + Outbox + Supabase langsung jika online)
+  const handleSimpanEditAdmin = async (e: Event) => {
     e.preventDefault();
-    if (!alasanBatal.trim()) {
+    if (!pesananDipilih) return;
+
+    const totalBaru = hitungTotalEdit();
+    let bayarBaru = editBayar;
+    if (editMetode === 'qris' || bayarBaru < totalBaru) {
+      bayarBaru = totalBaru;
+    }
+    const kembalianBaru = Math.max(0, bayarBaru - totalBaru);
+
+    const pesananTerupdate: PesananItem = {
+      ...pesananDipilih.pesanan,
+      metode: editMetode,
+      status: editStatus,
+      total: totalBaru,
+      bayar: bayarBaru,
+      kembalian: kembalianBaru,
+      catatan: editCatatan.trim() || null,
+      alasan_batal: editStatus === 'batal' ? (editAlasanBatal.trim() || 'Dibatalkan oleh Admin') : null,
+    };
+
+    const db = await getLocalDB();
+    const waktuISO = new Date().toISOString();
+
+    // Transaksi update lokal
+    const tx = db.transaction(['pesanan', 'item_pesanan', 'outbox'], 'readwrite');
+    await tx.objectStore('pesanan').put(pesananTerupdate);
+
+    // Hapus item lama yang di-delete/diupdate lalu simpan editItems
+    for (const it of editItems) {
+      await tx.objectStore('item_pesanan').put(it);
+    }
+
+    // Buat outbox untuk update server
+    const { kode_transaksi: _k, ...dataServer } = pesananTerupdate;
+    const outboxItem: OutboxItem = {
+      id: crypto.randomUUID(),
+      tabel: 'pesanan',
+      data: dataServer,
+      waktu: waktuISO,
+      status: 'pending',
+      percobaan: 0,
+    };
+    await tx.objectStore('outbox').put(outboxItem);
+    await tx.done;
+
+    pendingOutboxCountSignal.value = await db.count('outbox');
+
+    // Langsung tembak Supabase jika online agar langsung sinkron
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      try {
+        const supabase = await getSupabase();
+        await supabase.from('pesanan').upsert(dataServer);
+        for (const it of editItems) {
+          await supabase.from('item_pesanan').upsert(it);
+        }
+      } catch (err) {
+        console.warn('Gagal sinkron edit pesanan ke cloud:', err);
+      }
+      prosesOutbox().catch(() => {});
+    }
+
+    notifikasi(`Transaksi ${pesananDipilih.nomorAntrean} berhasil diperbarui oleh Admin!`);
+    setModeEdit(false);
+    setPesananDipilih(null);
+    await muatDataPesanan();
+  };
+
+  // Batalkan Cepat dari Detail
+  const handleBatalkanCepat = async (e: Event) => {
+    e.preventDefault();
+    if (!alasanBatalCepat.trim()) {
       setErrorBatal('Alasan pembatalan wajib diisi');
       return;
     }
-
     if (!pesananDipilih) return;
 
     try {
-      await batalkanPesananLokal(pesananDipilih.pesanan.id, alasanBatal.trim());
+      await batalkanPesananLokal(pesananDipilih.pesanan.id, alasanBatalCepat.trim());
       setModalBatal(false);
-      setAlasanBatal('');
+      setAlasanBatalCepat('');
       setErrorBatal('');
       setPesananDipilih(null);
+      notifikasi(`Pesanan ${pesananDipilih.nomorAntrean} telah dibatalkan.`);
       await muatDataPesanan();
     } catch (err: any) {
       setErrorBatal(err.message || 'Gagal membatalkan pesanan');
@@ -131,8 +292,7 @@ export function LayarRiwayatAdmin() {
 
     const res = await bagikanStruk(teks, pesananDipilih.nomorAntrean);
     if (res === 'clipboard') {
-      setNotifSalin('Teks struk berhasil disalin');
-      setTimeout(() => setNotifSalin(''), 3000);
+      notifikasi('Teks nota struk berhasil disalin ke clipboard');
     }
   };
 
@@ -152,11 +312,35 @@ export function LayarRiwayatAdmin() {
     .filter((p) => p.pesanan.status === 'selesai')
     .reduce((s, p) => s + (p.pesanan.total || 0), 0);
 
+  const totalLabaKotor = pesananTersaring
+    .filter((p) => p.pesanan.status === 'selesai')
+    .reduce((s, p) => s + p.totalLaba, 0);
+
+  const totalHppSemua = pesananTersaring
+    .filter((p) => p.pesanan.status === 'selesai')
+    .reduce((s, p) => s + p.totalHpp, 0);
+
+  const totalTunai = pesananTersaring
+    .filter((p) => p.pesanan.status === 'selesai' && p.pesanan.metode === 'tunai')
+    .reduce((s, p) => s + (p.pesanan.total || 0), 0);
+
+  const totalQris = pesananTersaring
+    .filter((p) => p.pesanan.status === 'selesai' && p.pesanan.metode === 'qris')
+    .reduce((s, p) => s + (p.pesanan.total || 0), 0);
+
   const totalBatal = pesananTersaring.filter((p) => p.pesanan.status === 'batal').length;
   const totalLunas = pesananTersaring.filter((p) => p.pesanan.status === 'selesai').length;
 
   return (
     <div class="min-h-screen bg-slate-50 pb-28 text-slate-900">
+      {/* Toast Notifikasi */}
+      {pesanNotif && (
+        <div class="fixed top-14 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-full text-xs font-semibold z-50 shadow-xl flex items-center gap-2">
+          <IconCheck size={14} color="#22c55e" />
+          <span>{pesanNotif}</span>
+        </div>
+      )}
+
       {/* ── HEADER HALAMAN ADMIN ── */}
       <div class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-2xs">
         <div class="max-w-4xl mx-auto px-4 py-3.5">
@@ -167,11 +351,11 @@ export function LayarRiwayatAdmin() {
                   ADMIN
                 </span>
                 <h1 class="text-base font-black text-slate-900 tracking-tight leading-tight">
-                  Riwayat Transaksi (Admin)
+                  Riwayat & Edit Transaksi
                 </h1>
               </div>
               <p class="text-[11px] text-slate-500 mt-0.5">
-                Audit & kelola seluruh transaksi kasir, filter per toko & tanggal
+                Audit, koreksi metode bayar/item, dan pantau laba keuntungan per transaksi
               </p>
             </div>
 
@@ -248,7 +432,7 @@ export function LayarRiwayatAdmin() {
                     metodeFilter === m ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500'
                   }`}
                 >
-                  {m === 'semua' ? 'Semua Metode' : m}
+                  {m === 'semua' ? 'Semua' : m}
                 </button>
               ))}
             </div>
@@ -269,24 +453,41 @@ export function LayarRiwayatAdmin() {
 
       {/* ── KONTEN UTAMA ── */}
       <div class="max-w-4xl mx-auto px-4 py-4 space-y-3.5">
-        {/* Ringkasan Singkat Filter Ini */}
-        <div class="grid grid-cols-3 gap-2 text-center">
+        {/* Ringkasan Finansial & Keuntungan Bersih (Khas Admin) */}
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-2xs">
-            <span class="text-[10px] font-bold uppercase text-slate-400 block">Total Omzet Lunas</span>
-            <span class="text-xs sm:text-sm font-black text-slate-900 tabular-nums">
+            <span class="text-[10px] font-bold uppercase text-slate-400 block">Total Omzet Penjualan</span>
+            <span class="text-sm font-black text-slate-900 tabular-nums">
               {formatRupiah(totalOmzetLunas)}
             </span>
+            <span class="text-[9px] text-slate-400 block mt-0.5">{totalLunas} nota lunas</span>
           </div>
-          <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-2xs">
-            <span class="text-[10px] font-bold uppercase text-emerald-600 block">Transaksi Lunas</span>
-            <span class="text-xs sm:text-sm font-black text-emerald-700 tabular-nums">
-              {totalLunas} Nota
+
+          <div class="bg-emerald-50/70 rounded-2xl border border-emerald-200/80 p-3 shadow-2xs">
+            <span class="text-[10px] font-bold uppercase text-emerald-800 block">Estimasi Laba Kotor</span>
+            <span class="text-sm font-black text-emerald-900 tabular-nums">
+              +{formatRupiah(totalLabaKotor)}
+            </span>
+            <span class="text-[9px] text-emerald-700 font-bold block mt-0.5">
+              Margin {totalOmzetLunas > 0 ? Math.round((totalLabaKotor / totalOmzetLunas) * 100) : 0}%
             </span>
           </div>
+
           <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-2xs">
-            <span class="text-[10px] font-bold uppercase text-rose-500 block">Dibatalkan</span>
-            <span class="text-xs sm:text-sm font-black text-rose-700 tabular-nums">
-              {totalBatal} Nota
+            <span class="text-[10px] font-bold uppercase text-slate-400 block">Rincian Pembayaran</span>
+            <div class="text-[11px] font-bold text-slate-700 mt-0.5">
+              <span>Tunai: {formatRupiah(totalTunai)}</span>
+              <span class="block text-indigo-700">QRIS: {formatRupiah(totalQris)}</span>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-2xs">
+            <span class="text-[10px] font-bold uppercase text-slate-400 block">Estimasi Modal / HPP</span>
+            <span class="text-sm font-black text-slate-700 tabular-nums">
+              {formatRupiah(totalHppSemua)}
+            </span>
+            <span class="text-[9px] text-rose-600 block mt-0.5">
+              {totalBatal > 0 ? `${totalBatal} transaksi dibatalkan` : 'Semua transaksi tercatat'}
             </span>
           </div>
         </div>
@@ -302,15 +503,16 @@ export function LayarRiwayatAdmin() {
             Tidak ada transaksi yang cocok dengan filter atau tanggal ini.
           </div>
         ) : (
-          <div class="space-y-2">
-            {pesananTersaring.map(({ pesanan, items, nomorAntrean }) => {
+          <div class="space-y-2.5">
+            {pesananTersaring.map((item) => {
+              const { pesanan, items, nomorAntrean, totalLaba, marginPersen } = item;
               const totalItem = items.reduce((s, it) => s + it.qty, 0);
               const isBatal = pesanan.status === 'batal';
 
               return (
                 <div
                   key={pesanan.id}
-                  onClick={() => setPesananDipilih({ pesanan, items, nomorAntrean })}
+                  onClick={() => bukaDetail(item)}
                   class={`bg-white rounded-2xl border p-3.5 shadow-2xs cursor-pointer hover:border-slate-400 transition-all ${
                     isBatal ? 'border-rose-200 bg-rose-50/20 opacity-80' : 'border-slate-200'
                   }`}
@@ -341,9 +543,14 @@ export function LayarRiwayatAdmin() {
                         {totalItem} item ({items.map((it) => `${it.qty}x ${it.nama_produk}`).join(', ')})
                       </p>
 
-                      <div class="flex items-center gap-2 text-[10px] text-slate-400 mt-1">
+                      <div class="flex items-center gap-2 text-[10px] text-slate-400 mt-1 flex-wrap">
                         <span>{formatWaktu(pesanan.waktu)}</span>
-                        {pesanan.catatan && <span>· Catatan: "{pesanan.catatan}"</span>}
+                        {!isBatal && (
+                          <span class="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                            Laba: +{formatRupiah(totalLaba)} ({marginPersen}%)
+                          </span>
+                        )}
+                        {pesanan.catatan && <span>· "{pesanan.catatan}"</span>}
                         {isBatal && pesanan.alasan_batal && (
                           <span class="text-rose-600 font-bold">· Alasan: {pesanan.alasan_batal}</span>
                         )}
@@ -358,9 +565,17 @@ export function LayarRiwayatAdmin() {
                       >
                         {formatRupiah(pesanan.total)}
                       </span>
-                      <span class="text-[10px] font-semibold text-slate-400 uppercase">
-                        {pesanan.status}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          bukaDetail(item);
+                          setModeEdit(true);
+                        }}
+                        class="mt-1 text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200 transition-colors"
+                      >
+                        ✎ Edit Transaksi
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -370,134 +585,354 @@ export function LayarRiwayatAdmin() {
         )}
       </div>
 
-      {/* ── MODAL DETAIL TRANSAKSI ADMIN ── */}
+      {/* ── MODAL DETAIL & EDIT TRANSAKSI OLEH ADMIN ── */}
       {pesananDipilih && !modalBatal && (
         <div class="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 max-h-[85vh] overflow-y-auto shadow-2xl space-y-4">
-            <div class="flex items-start justify-between">
+          <div class="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
+            {/* Header Modal */}
+            <div class="flex items-start justify-between pb-2 border-b border-slate-100">
               <div>
-                <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                  Detail Transaksi (Admin)
-                </span>
-                <h3 class="text-base font-black text-slate-900">
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded uppercase">
+                    Admin Kontrol
+                  </span>
+                  <span class="text-xs font-bold text-slate-500 font-mono">
+                    {pesananDipilih.pesanan.kode_transaksi || pesananDipilih.pesanan.id.slice(0, 8)}
+                  </span>
+                </div>
+                <h3 class="text-base font-black text-slate-900 mt-1">
                   Antrean: {pesananDipilih.nomorAntrean}
                 </h3>
-                {pesananDipilih.pesanan.kode_transaksi && (
-                  <p class="text-xs font-mono text-slate-500">{pesananDipilih.pesanan.kode_transaksi}</p>
+              </div>
+
+              <div class="flex items-center gap-1.5">
+                {!modeEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => setModeEdit(true)}
+                    class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    ✎ Edit
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setModeEdit(false)}
+                    class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Batal Edit
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPesananDipilih(null)}
+                  class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 cursor-pointer"
+                >
+                  <IconTutup size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* KARTU KEUNTUNGAN / LABA BERSIH TRANSAKSI INI */}
+            <div class="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between text-xs">
+              <div>
+                <span class="text-[10px] font-bold uppercase text-emerald-800 block">
+                  Analisis Keuntungan Transaksi
+                </span>
+                <span class="text-xs text-emerald-950">
+                  Estimasi HPP: {formatRupiah(pesananDipilih.totalHpp)}
+                </span>
+              </div>
+              <div class="text-right">
+                <span class="text-sm font-black text-emerald-900 block tabular-nums">
+                  +{formatRupiah(pesananDipilih.totalLaba)}
+                </span>
+                <span class="text-[10px] font-bold text-emerald-700">
+                  Margin: {pesananDipilih.marginPersen}%
+                </span>
+              </div>
+            </div>
+
+            {/* FORM EDIT MODE vs VIEW MODE */}
+            {!modeEdit ? (
+              /* ── TAMPILAN DETAIL (VIEW) ── */
+              <div class="space-y-3.5">
+                <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-2xl">
+                  <div>
+                    <span class="text-[10px] text-slate-400 block uppercase">Waktu Pembelian</span>
+                    <strong class="text-slate-800">{formatTanggalWaktu(pesananDipilih.pesanan.waktu)}</strong>
+                  </div>
+                  <div>
+                    <span class="text-[10px] text-slate-400 block uppercase">Metode & Status</span>
+                    <strong class="text-slate-800 uppercase">
+                      {pesananDipilih.pesanan.metode} · {pesananDipilih.pesanan.status}
+                    </strong>
+                  </div>
+                  {pesananDipilih.pesanan.catatan && (
+                    <div class="col-span-2 pt-1 border-t border-slate-200">
+                      <span class="text-[10px] text-slate-400 block uppercase">Catatan Pesanan</span>
+                      <p class="text-slate-800 font-medium">{pesananDipilih.pesanan.catatan}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Item List */}
+                <div class="border-t border-slate-100 pt-2 space-y-2 text-xs">
+                  <span class="text-[10px] font-black uppercase text-slate-400 block">Item Menu</span>
+                  {pesananDipilih.items.map((it) => {
+                    const totalTambahan = it.tambahan.reduce((s, t) => s + t.harga * t.qty, 0);
+                    const subtotal = (it.harga_satuan + totalTambahan) * it.qty;
+                    return (
+                      <div key={it.id} class="flex justify-between items-start">
+                        <div>
+                          <span class="font-bold text-slate-900">{it.qty}x {it.nama_produk}</span>
+                          {it.tambahan.map((t) => (
+                            <span key={t.nama} class="block text-[10px] text-slate-500 pl-3">
+                              + {t.nama} ({formatRupiah(t.harga)})
+                            </span>
+                          ))}
+                        </div>
+                        <span class="font-bold tabular-nums text-slate-900">{formatRupiah(subtotal)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Total */}
+                <div class="border-t border-slate-100 pt-2.5 space-y-1 text-xs">
+                  <div class="flex justify-between text-slate-600">
+                    <span>Total Tagihan:</span>
+                    <strong class="text-sm font-black text-slate-900 tabular-nums">
+                      {formatRupiah(pesananDipilih.pesanan.total)}
+                    </strong>
+                  </div>
+                  <div class="flex justify-between text-slate-500">
+                    <span>Uang Diterima:</span>
+                    <span class="tabular-nums">{formatRupiah(pesananDipilih.pesanan.bayar)}</span>
+                  </div>
+                  <div class="flex justify-between text-emerald-700 font-bold">
+                    <span>Kembalian:</span>
+                    <span class="tabular-nums">{formatRupiah(pesananDipilih.pesanan.kembalian)}</span>
+                  </div>
+                </div>
+
+                {pesananDipilih.pesanan.status === 'batal' && (
+                  <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
+                    <strong>Pesanan Dibatalkan</strong>
+                    <p class="mt-0.5">Alasan: {pesananDipilih.pesanan.alasan_batal || '-'}</p>
+                  </div>
+                )}
+
+                {/* Tombol Aksi */}
+                <div class="grid grid-cols-2 gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCetak}
+                    class="py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <IconPrinter size={15} />
+                    <span>Cetak Struk</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBagikan}
+                    class="py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <IconShare size={15} />
+                    <span>Bagikan Nota</span>
+                  </button>
+                </div>
+
+                {pesananDipilih.pesanan.status === 'selesai' && (
+                  <button
+                    type="button"
+                    onClick={() => setModalBatal(true)}
+                    class="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-rose-200"
+                  >
+                    Batalkan Transaksi Ini
+                  </button>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => setPesananDipilih(null)}
-                class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 cursor-pointer"
-              >
-                <IconTutup size={14} />
-              </button>
-            </div>
+            ) : (
+              /* ── FORM EDIT TRANSAKSI OLEH ADMIN ── */
+              <form onSubmit={handleSimpanEditAdmin} class="space-y-4">
+                <div class="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 text-xs text-amber-950">
+                  <strong class="block mb-0.5">Mode Koreksi Data Admin:</strong>
+                  Ubah metode pembayaran (mis. dari Tunai ke QRIS atau sebaliknya), kuantitas menu, status, atau catatan. Perubahan akan otomatis disinkronkan ke cloud.
+                </div>
 
-            {notifSalin && (
-              <div class="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl text-center font-bold">
-                {notifSalin}
-              </div>
-            )}
-
-            {/* Info Status */}
-            <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-2xl">
-              <div>
-                <span class="text-[10px] text-slate-400 block uppercase">Waktu</span>
-                <strong class="text-slate-800">{formatTanggalWaktu(pesananDipilih.pesanan.waktu)}</strong>
-              </div>
-              <div>
-                <span class="text-[10px] text-slate-400 block uppercase">Status & Metode</span>
-                <strong class="text-slate-800 uppercase">
-                  {pesananDipilih.pesanan.status} · {pesananDipilih.pesanan.metode}
-                </strong>
-              </div>
-            </div>
-
-            {/* Item Pesanan */}
-            <div class="border-t border-slate-100 pt-3 space-y-2 text-xs">
-              <span class="text-[10px] font-black uppercase text-slate-400 block">Rincian Menu</span>
-              {pesananDipilih.items.map((it) => {
-                const totalTambahan = it.tambahan.reduce((s, t) => s + t.harga * t.qty, 0);
-                const subtotal = (it.harga_satuan + totalTambahan) * it.qty;
-                return (
-                  <div key={it.id} class="flex justify-between items-start">
-                    <div>
-                      <span class="font-bold text-slate-900">{it.qty}x {it.nama_produk}</span>
-                      {it.tambahan.map((t) => (
-                        <span key={t.nama} class="block text-[10px] text-slate-500 pl-3">
-                          + {t.nama} ({formatRupiah(t.harga)})
-                        </span>
-                      ))}
-                    </div>
-                    <span class="font-bold tabular-nums text-slate-900">{formatRupiah(subtotal)}</span>
+                {/* 1. Ubah Metode Pembayaran */}
+                <div>
+                  <label class="block text-xs font-bold text-slate-800 mb-1.5">
+                    1. Metode Pembayaran:
+                  </label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditMetode('tunai')}
+                      class={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        editMetode === 'tunai'
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      💵 TUNAI (Cash)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditMetode('qris')}
+                      class={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        editMetode === 'qris'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      📱 QRIS Dinamis
+                    </button>
                   </div>
-                );
-              })}
-            </div>
+                </div>
 
-            {/* Total */}
-            <div class="border-t border-slate-100 pt-3 space-y-1 text-xs">
-              <div class="flex justify-between text-slate-600">
-                <span>Total Tagihan:</span>
-                <strong class="text-sm font-black text-slate-900 tabular-nums">
-                  {formatRupiah(pesananDipilih.pesanan.total)}
-                </strong>
-              </div>
-              <div class="flex justify-between text-slate-500">
-                <span>Uang Diterima:</span>
-                <span class="tabular-nums">{formatRupiah(pesananDipilih.pesanan.bayar)}</span>
-              </div>
-              <div class="flex justify-between text-emerald-700 font-bold">
-                <span>Kembalian:</span>
-                <span class="tabular-nums">{formatRupiah(pesananDipilih.pesanan.kembalian)}</span>
-              </div>
-            </div>
+                {/* 2. Ubah Status Transaksi */}
+                <div>
+                  <label class="block text-xs font-bold text-slate-800 mb-1.5">
+                    2. Status Transaksi:
+                  </label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditStatus('selesai')}
+                      class={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        editStatus === 'selesai'
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      ✓ LUNAS (Selesai)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditStatus('batal')}
+                      class={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        editStatus === 'batal'
+                          ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      ✕ DIBATALKAN
+                    </button>
+                  </div>
+                  {editStatus === 'batal' && (
+                    <input
+                      type="text"
+                      placeholder="Masukkan alasan pembatalan..."
+                      value={editAlasanBatal}
+                      onInput={(e) => setEditAlasanBatal((e.target as HTMLInputElement).value)}
+                      class="w-full mt-2 px-3 py-2 bg-slate-50 border border-rose-200 rounded-xl text-xs text-rose-900 focus:outline-hidden"
+                    />
+                  )}
+                </div>
 
-            {/* Alasan batal jika ada */}
-            {pesananDipilih.pesanan.status === 'batal' && (
-              <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
-                <strong>Pesanan Dibatalkan</strong>
-                <p class="mt-0.5">Alasan: {pesananDipilih.pesanan.alasan_batal || '-'}</p>
-              </div>
-            )}
+                {/* 3. Koreksi Kuantitas Item Menu */}
+                <div>
+                  <label class="block text-xs font-bold text-slate-800 mb-1.5">
+                    3. Kuantitas Menu Pesanan:
+                  </label>
+                  <div class="space-y-2 border border-slate-200 rounded-2xl p-2.5 bg-slate-50/50">
+                    {editItems.map((it, idx) => {
+                      const totTambahan = it.tambahan.reduce((s, x) => s + x.harga * x.qty, 0);
+                      const subtotal = (it.harga_satuan + totTambahan) * it.qty;
+                      return (
+                        <div key={it.id} class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-100 text-xs">
+                          <div class="min-w-0 flex-1 pr-2">
+                            <span class="font-bold text-slate-900 block truncate">{it.nama_produk}</span>
+                            <span class="text-[10px] text-slate-400 font-mono">{formatRupiah(it.harga_satuan)}</span>
+                          </div>
 
-            {/* Aksi */}
-            <div class="grid grid-cols-2 gap-2 pt-2">
-              <button
-                type="button"
-                onClick={handleCetak}
-                class="py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <IconPrinter size={15} />
-                <span>Cetak Ulang</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleBagikan}
-                class="py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <IconShare size={15} />
-                <span>Bagikan</span>
-              </button>
-            </div>
+                          <div class="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => ubahQtyEditItem(idx, -1)}
+                              class="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold cursor-pointer"
+                            >
+                              -
+                            </button>
+                            <span class="font-bold font-mono w-5 text-center text-xs">{it.qty}</span>
+                            <button
+                              type="button"
+                              onClick={() => ubahQtyEditItem(idx, 1)}
+                              class="w-6 h-6 rounded-lg bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center font-bold cursor-pointer"
+                            >
+                              +
+                            </button>
+                            <span class="font-bold font-mono text-slate-900 w-24 text-right tabular-nums">
+                              {formatRupiah(subtotal)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
 
-            {/* Tombol Batalkan untuk Admin jika belum dibatalkan */}
-            {pesananDipilih.pesanan.status === 'selesai' && (
-              <button
-                type="button"
-                onClick={() => setModalBatal(true)}
-                class="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-rose-200"
-              >
-                Batalkan Pesanan Ini (Otoritas Admin)
-              </button>
+                {/* 4. Total Kalkulasi Baru & Uang Diterima */}
+                <div class="p-3 bg-slate-100 rounded-2xl space-y-2 text-xs">
+                  <div class="flex justify-between items-center font-bold text-slate-700">
+                    <span>Total Tagihan Baru:</span>
+                    <strong class="text-base font-black text-slate-900 tabular-nums font-mono">
+                      {formatRupiah(hitungTotalEdit())}
+                    </strong>
+                  </div>
+
+                  {editMetode === 'tunai' && (
+                    <div>
+                      <label class="block text-[11px] font-bold text-slate-600 mb-1">
+                        Uang Tunai Fisik Diterima Kasir:
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1000}
+                        value={editBayar}
+                        onInput={(e) => setEditBayar(Number((e.target as HTMLInputElement).value) || 0)}
+                        class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold font-mono text-slate-900 text-sm tabular-nums"
+                      />
+                      <div class="flex justify-between text-[11px] font-semibold text-emerald-800 mt-1">
+                        <span>Kembalian:</span>
+                        <span class="font-bold">{formatRupiah(Math.max(0, editBayar - hitungTotalEdit()))}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. Catatan Tambahan */}
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                    Catatan Transaksi:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Koreksi pembayaran dari QRIS ke Tunai"
+                    value={editCatatan}
+                    onInput={(e) => setEditCatatan((e.target as HTMLInputElement).value)}
+                    class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-hidden"
+                  />
+                </div>
+
+                {/* Tombol Simpan Perubahan */}
+                <button
+                  type="submit"
+                  class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black tracking-wide transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <IconCheck size={16} color="#22c55e" />
+                  <span>Simpan Perubahan Transaksi Ini</span>
+                </button>
+              </form>
             )}
           </div>
         </div>
       )}
 
-      {/* ── MODAL KONFIRMASI BATAL ── */}
+      {/* ── MODAL KONFIRMASI BATAL CEPAT ── */}
       {modalBatal && pesananDipilih && (
         <div class="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center z-60 p-4">
           <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-3">
@@ -505,7 +940,7 @@ export function LayarRiwayatAdmin() {
               Batalkan Pesanan {pesananDipilih.nomorAntrean}?
             </h3>
             <p class="text-xs text-slate-500">
-              Sebagai Admin, masukkan alasan resmi pembatalan pesanan untuk log audit:
+              Masukkan alasan resmi pembatalan pesanan untuk pencatatan log audit toko:
             </p>
 
             {errorBatal && (
@@ -514,13 +949,13 @@ export function LayarRiwayatAdmin() {
               </div>
             )}
 
-            <form onSubmit={handleBatalkan} class="space-y-3">
+            <form onSubmit={handleBatalkanCepat} class="space-y-3">
               <textarea
                 required
                 rows={3}
-                placeholder="Contoh: Kesalahan input menu / permintaan refund pelanggan"
-                value={alasanBatal}
-                onInput={(e) => setAlasanBatal((e.target as HTMLTextAreaElement).value)}
+                placeholder="Contoh: Pelanggan membatalkan pesanan sebelum dibuat"
+                value={alasanBatalCepat}
+                onInput={(e) => setAlasanBatalCepat((e.target as HTMLTextAreaElement).value)}
                 class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-slate-900"
                 autoFocus
               />
