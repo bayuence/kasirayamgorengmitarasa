@@ -8,12 +8,17 @@ let supabasePresensiInstance: SupabaseClient | null = null;
  */
 export async function getSupabase(): Promise<SupabaseClient> {
   if (!supabaseInstance) {
-    const supabaseUrl =
-      import.meta.env.VITE_SUPABASE_URL ||
-      'https://dkkgncgioenbrkzqqekn.supabase.co';
-    const supabaseAnonKey =
-      import.meta.env.VITE_SUPABASE_ANON_KEY ||
-      'sb_publishable_dBGwaMxyCffekjt6YDVJww_pQApMkMK';
+    let supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    let supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+    // Pastikan selalu terhubung ke database resmi proyek Mitarasa ini (dkkgncgioenbrkzqqekn)
+    // dan tolak jika ada injeksi environment variable lama yang mengarah ke proyek lain/mati
+    if (!supabaseUrl || supabaseUrl.includes('dgnpcutgnmrsyjaspgwj')) {
+      supabaseUrl = 'https://dkkgncgioenbrkzqqekn.supabase.co';
+    }
+    if (!supabaseAnonKey || supabaseAnonKey.length < 20) {
+      supabaseAnonKey = 'sb_publishable_dBGwaMxyCffekjt6YDVJww_pQApMkMK';
+    }
 
     const { createClient } = await import('@supabase/supabase-js');
     supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
